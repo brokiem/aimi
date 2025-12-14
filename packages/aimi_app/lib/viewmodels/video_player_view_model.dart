@@ -63,6 +63,13 @@ class VideoPlayerViewModel extends ChangeNotifier {
   static const _saveInterval = Duration(seconds: 10);
   DateTime? _lastSaveTime;
 
+  // Stall detection
+  Timer? _stallDetectionTimer;
+  bool _isStalled = false;
+  Duration _lastStallCheckPosition = Duration.zero;
+
+  bool get isStalled => _isStalled;
+
   VideoPlayerViewModel({
     required List<StreamingSource> sources,
     required String episodeTitle,
@@ -116,6 +123,9 @@ class VideoPlayerViewModel extends ChangeNotifier {
 
     // Restore volume
     await _loadSavedVolume();
+
+    // Start stall detection
+    _startStallDetection();
 
     // Listen to volume changes
     _volumeSubscription = player.stream.volume.listen((volume) {
@@ -497,7 +507,9 @@ class VideoPlayerViewModel extends ChangeNotifier {
     _positionSubscription?.cancel();
     _durationSubscription?.cancel();
     _volumeSubscription?.cancel();
+    _volumeSubscription?.cancel();
     _volumeSaveDebounce?.cancel();
+    _stallDetectionTimer?.cancel();
     _feedbackController.close();
 
     // Only dispose player if we're not currently saving a thumbnail
@@ -549,5 +561,44 @@ class VideoPlayerViewModel extends ChangeNotifier {
 
   Future<void> _saveVolume(double volume) async {
     await _preferencesService?.set(PrefKey.videoVolume, volume);
+  }
+
+  void _startStallDetection() {
+    _stallDetectionTimer?.cancel();
+    // Check every 1 second as requested
+    _stallDetectionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_isDisposed) {
+        timer.cancel();
+        return;
+      }
+
+      final currentPos = player.state.position;
+      final isPlaying = player.state.playing;
+      final isBuffering = player.state.buffering;
+
+      // Logic: If playing AND not buffering AND position hasn't changed -> Stalled
+      if (isPlaying && !isBuffering) {
+        if (currentPos == _lastStallCheckPosition) {
+          if (!_isStalled) {
+            _isStalled = true;
+            notifyListeners();
+          }
+        } else {
+          // Position moved, so we are not stalled
+          if (_isStalled) {
+            _isStalled = false;
+            notifyListeners();
+          }
+        }
+      } else {
+        // If paused or already buffering, we rely on standard UI (or it's paused)
+        if (_isStalled) {
+          _isStalled = false;
+          notifyListeners();
+        }
+      }
+
+      _lastStallCheckPosition = currentPos;
+    });
   }
 }

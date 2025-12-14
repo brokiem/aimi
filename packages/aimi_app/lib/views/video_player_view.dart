@@ -285,18 +285,24 @@ class _VideoPlayerViewState extends State<VideoPlayerView> {
               ),
           ],
         ),
-        // Buffering indicator
+        // Buffering/Stall indicator
         StreamBuilder<bool>(
           stream: viewModel.player.stream.buffering,
           builder: (context, snapshot) {
-            if (snapshot.data == true) {
-              return const SizedBox(
-                width: 75,
-                height: 75,
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 4),
-              );
-            }
-            return const SizedBox.shrink();
+            final isBuffering = snapshot.data ?? false;
+            return Selector<VideoPlayerViewModel, bool>(
+              selector: (_, vm) => vm.isStalled,
+              builder: (context, isStalled, _) {
+                if (isBuffering || isStalled) {
+                  return const SizedBox(
+                    width: 75,
+                    height: 75,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 4),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            );
           },
         ),
       ],
