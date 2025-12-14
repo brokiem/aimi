@@ -468,6 +468,7 @@ class VideoPlayerViewModel extends ChangeNotifier {
     _currentSourceIndex = 0;
 
     // Reset state
+    await player.stop();
     _externalSubtitles = [];
     _lastSavedPosition = Duration.zero;
     _currentDuration = Duration.zero;
