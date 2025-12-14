@@ -247,8 +247,8 @@ class _ProviderTab extends StatelessWidget {
           if (isLoading && episodeCount == 0) ...[
             const SizedBox(width: 8),
             SizedBox(
-              width: 22,
-              height: 22,
+              width: 16,
+              height: 16,
               child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.primary),
             ),
           ] else if (episodeCount > 0) ...[
