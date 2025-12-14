@@ -64,6 +64,25 @@ Follow these steps to set up the project locally.
    flutter run
    ```
 
+## 📦 Prebuilt binaries / Releases
+
+You can download ready-to-run binaries and installer files from the Releases page: https://github.com/brokiem/aimi/releases
+
+Below are the typical files attached to each release and what they mean:
+
+- app-arm64-v8a-release.apk — 64-bit Android build (arm64). Use on modern Android phones and tablets.
+- app-armeabi-v7a-release.apk — 32-bit Android build (armv7). Use on older devices that require 32-bit binaries.
+- app-x86_64-release.apk — x86-64 Android build. Usually intended for Android emulators running on x86_64 hosts.
+- aimi-windows.zip — Windows binaries. Unzip and run `aimi_app.exe` to start the app.
+- aimi-linux.zip — Linux binaries. Unzip, make the binary executable if needed, and run `./aimi_app`.
+
+Quick tips:
+
+- Installing APKs: enable "Install unknown apps" on the device or install via `adb install path/to/app.apk`.
+- Emulators: prefer the `app-x86_64-release.apk` for emulators (better compatibility/performance).
+- Windows: if Windows SmartScreen warns, you may need to allow the app or unblock the file via Properties -> Unblock.
+- Linux: after unzipping, run `chmod +x aimi_app` if the binary isn't executable, then run `./aimi_app`.
+
 ## 🔌 Supported Providers
 
 Currently, the following providers are implemented in `aimi_lib`:
@@ -85,4 +104,3 @@ Currently, the following providers are implemented in `aimi_lib`:
 ## 📄 License
 
 This project is licensed under the GNU v2.0 License - see the [LICENSE](LICENSE) file for details.
-
