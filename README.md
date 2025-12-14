@@ -3,9 +3,8 @@
 **Aimi** is a modern, cross-platform anime streaming application built with Flutter. It features a modular architecture that separates the UI from the underlying data sources, allowing for a resilient
 and customizable streaming experience.
 
-|                                   |                                   |
-|:---------------------------------:|:---------------------------------:|
 |  ![Screenshot 1](images/img.png)  | ![Screenshot 3](images/img_2.png) |
+|:---------------------------------:|:---------------------------------:|
 | ![Screenshot 4](images/img_3.png) | ![Screenshot 5](images/img_4.png) |
 
 ## ✨ Key Features
@@ -36,7 +35,6 @@ Follow these steps to set up the project locally.
 ### Prerequisites
 
 - [Flutter SDK](https://docs.flutter.dev/get-started/install) (Latest Stable)
-- [Dart SDK](https://dart.dev/get-dart)
 - An IDE (VS Code or Android Studio) with Flutter plugins installed.
 
 ### Installation
@@ -76,7 +74,7 @@ Currently, the following providers are implemented in `aimi_lib`:
 | **Streaming** | AnimePahe | ✅ Active |
 | **Streaming** | Anizone   | ✅ Active |
 
-## 🤝 Con tributingCont ributions are welcome! If you'd like to add a new provider or improve the UI:
+## 🤝 Conributions are welcome! If you'd like to add a new provider or improve the UI:
 
 1. Fork the repository.
 2. Create a feature branch (`git checkout -b feature/amazing-feature`).
