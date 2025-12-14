@@ -1,4 +1,4 @@
-name: Pre-Release
+name: Nightly Build
 
 on:
   workflow_run:
@@ -40,17 +40,22 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create Pre-Release
+      - name: Zip Builds
+        run: |
+          cd artifacts/windows && zip -r ../../aimi-windows.zip . && cd ../..
+          cd artifacts/linux && zip -r ../../aimi-linux.zip . && cd ../..
+
+      - name: Create Nightly Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: pre-${{ github.event.workflow_run.head_sha }}
-          name: Pre-Release ${{ github.event.workflow_run.head_sha }}
-          body: Automated pre-release for commit ${{ github.event.workflow_run.head_sha }}
+          tag_name: nightly-${{ github.event.workflow_run.head_sha }}
+          name: Nightly Build ${{ github.event.workflow_run.head_sha }}
+          body: Automated nightly build for commit ${{ github.event.workflow_run.head_sha }}
           prerelease: true
           target_commitish: ${{ github.event.workflow_run.head_sha }}
           files: |
             artifacts/android/*.apk
-            artifacts/windows/**/*
-            artifacts/linux/**/*
+            aimi-windows.zip
+            aimi-linux.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
