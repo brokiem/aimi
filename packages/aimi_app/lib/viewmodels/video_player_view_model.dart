@@ -12,8 +12,14 @@ import '../services/thumbnail_service.dart';
 import '../services/watch_history_service.dart';
 
 class VideoPlayerViewModel extends ChangeNotifier {
-  final List<StreamingSource> sources;
-  final String episodeTitle;
+  List<StreamingSource> _sources;
+
+  List<StreamingSource> get sources => _sources;
+
+  String _episodeTitle;
+
+  String get episodeTitle => _episodeTitle;
+
   final String animeTitle;
 
   // Watch history tracking
@@ -21,9 +27,19 @@ class VideoPlayerViewModel extends ChangeNotifier {
   final PreferencesService? _preferencesService;
   final ThumbnailService? _thumbnailService;
   final int? animeId;
-  final String? episodeId;
-  final String? episodeNumber;
-  final String? streamProviderName;
+
+  String? _episodeId;
+
+  String? get episodeId => _episodeId;
+
+  String? _episodeNumber;
+
+  String? get episodeNumber => _episodeNumber;
+
+  String? _streamProviderName;
+
+  String? get streamProviderName => _streamProviderName;
+
   final String? metadataProviderName;
 
   late final Player player;
@@ -48,18 +64,23 @@ class VideoPlayerViewModel extends ChangeNotifier {
   DateTime? _lastSaveTime;
 
   VideoPlayerViewModel({
-    required this.sources,
-    required this.episodeTitle,
+    required List<StreamingSource> sources,
+    required String episodeTitle,
     this.animeTitle = '',
     WatchHistoryService? watchHistoryService,
     PreferencesService? preferencesService,
     ThumbnailService? thumbnailService,
     this.animeId,
-    this.episodeId,
-    this.episodeNumber,
-    this.streamProviderName,
+    String? episodeId,
+    String? episodeNumber,
+    String? streamProviderName,
     this.metadataProviderName,
-  }) : _watchHistoryService = watchHistoryService,
+  }) : _sources = sources,
+       _episodeTitle = episodeTitle,
+       _episodeId = episodeId,
+       _episodeNumber = episodeNumber,
+       _streamProviderName = streamProviderName,
+       _watchHistoryService = watchHistoryService,
        _preferencesService = preferencesService,
        _thumbnailService = thumbnailService {
     _initialize();
@@ -425,6 +446,40 @@ class VideoPlayerViewModel extends ChangeNotifier {
   Future<void> setPlaybackSpeed(double speed) async {
     await player.setRate(speed);
     _feedbackController.add(VideoFeedbackEvent(FeedbackType.speed, '${speed}x'));
+  }
+
+  Future<void> playEpisode({
+    required String episodeId,
+    required String episodeNumber,
+    required String episodeTitle,
+    required List<StreamingSource> sources,
+    required String streamProviderName,
+  }) async {
+    if (_isDisposed) return;
+
+    // Save progress for the current episode
+    await _saveProgress(player.state.position);
+
+    _episodeId = episodeId;
+    _episodeNumber = episodeNumber;
+    _episodeTitle = episodeTitle;
+    _sources = sources;
+    _streamProviderName = streamProviderName;
+    _currentSourceIndex = 0;
+
+    // Reset state
+    _externalSubtitles = [];
+    _lastSavedPosition = Duration.zero;
+    _currentDuration = Duration.zero;
+    _lastSaveTime = null;
+
+    notifyListeners();
+
+    if (_sources.isNotEmpty) {
+      _currentSourceIndex = _getBestQualityIndex();
+      await _loadSource(_sources[_currentSourceIndex]);
+      await _loadSavedPosition();
+    }
   }
 
   bool _isSavingThumbnail = false;

@@ -27,11 +27,6 @@ class DetailViewModel extends ChangeNotifier {
   List<StreamingSource> _sources = [];
 
   // Per-provider episode cache: providerName -> episodes
-  // We now delegate caching to StreamingService for persistence, but we can keep local references for UI binding if needed
-  // changing _episodeCache to just be a helper or verify if we need it.
-  // Actually, DetailViewModel needs to expose _episodes for the CURRENT provider.
-  // But for the tabs, it needs episode counts.
-  // We should fetch from service cache.
 
   // Getters
   ProviderLoadingState get state => _state;
@@ -285,9 +280,6 @@ class DetailViewModel extends ChangeNotifier {
           ) ??
           _providerRegistry.current;
       // Note: Episode sourceId usually doesn't contain provider info, so we rely on current provider or registry.
-      // Actually, we should know which provider this episode belongs to.
-      // Current architecture assumes DetailViewModel is viewing "Current Provider"'s episodes.
-      // So using _providerRegistry.current is correct for generating sources for THE current episode list.
 
       _sources = await _streamingService.getSources(provider, episode);
       // Wait, is 'provider' correct? provider is resolved from episode ID or current.

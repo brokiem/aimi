@@ -127,6 +127,7 @@ class _DetailViewState extends State<DetailView> with TickerProviderStateMixin {
                   sources: sources,
                   episodeTitle: 'Episode ${episode.number}',
                   animeTitle: viewModel.anime.title.romaji ?? viewModel.anime.title.english ?? '',
+                  detailViewModel: viewModel,
                   animeId: viewModel.anime.id,
                   episodeId: episode.id,
                   episodeNumber: episode.number,

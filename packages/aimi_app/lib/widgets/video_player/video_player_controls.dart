@@ -20,6 +20,7 @@ class VideoPlayerControls extends StatefulWidget {
   final VoidCallback onBack;
   final VoidCallback onSettingsPressed;
   final Stream<VideoFeedbackEvent> feedbackStream;
+  final VoidCallback? onShowEpisodes;
 
   const VideoPlayerControls({
     super.key,
@@ -28,6 +29,7 @@ class VideoPlayerControls extends StatefulWidget {
     required this.onBack,
     required this.onSettingsPressed,
     required this.feedbackStream,
+    this.onShowEpisodes,
   });
 
   @override
@@ -422,28 +424,31 @@ class _VideoPlayerControlsState extends State<VideoPlayerControls> with SingleTi
               colors: [Colors.black54, Colors.transparent],
             ),
           ),
-          child: Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: widget.onBack,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  widget.videoTitle,
-                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                  overflow: TextOverflow.ellipsis,
+          child: SafeArea(
+            bottom: false,
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: widget.onBack,
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.settings, color: Colors.white),
-                onPressed: () {
-                  _onUserInteraction();
-                  widget.onSettingsPressed();
-                },
-              ),
-            ],
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    widget.videoTitle,
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.settings, color: Colors.white),
+                  onPressed: () {
+                    _onUserInteraction();
+                    widget.onSettingsPressed();
+                  },
+                ),
+              ],
+            ),
           ),
         ),
 
@@ -473,58 +478,61 @@ class _VideoPlayerControlsState extends State<VideoPlayerControls> with SingleTi
               colors: [Colors.black54, Colors.transparent],
             ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  StreamBuilder<Duration>(
-                    stream: player.stream.position,
-                    builder: (context, snapshot) {
-                      final position = _draggingPosition ?? snapshot.data ?? Duration.zero;
-                      final duration = player.state.duration;
-                      return Text(
-                        '${_formatDuration(position)} / ${_formatDuration(duration)}',
-                        style: const TextStyle(color: Colors.white),
-                      );
-                    },
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.fullscreen, color: Colors.white),
-                    onPressed: _toggleFullscreen,
-                  ),
-                ],
-              ),
-              StreamBuilder<Duration>(
-                stream: player.stream.position,
-                builder: (context, snapshot) {
-                  final position = snapshot.data ?? Duration.zero;
-                  final duration = player.state.duration;
-                  return StreamBuilder<Duration>(
-                    stream: player.stream.buffer,
-                    builder: (context, snapshotBuffer) {
-                      final buffer = snapshotBuffer.data ?? Duration.zero;
-                      return VideoProgressBar(
-                        position: position,
-                        duration: duration,
-                        buffer: buffer,
-                        onSeek: (pos) {
-                          _onUserInteraction();
-                          player.seek(pos);
-                        },
-                        onDragStart: (_) => _cancelHideTimer(),
-                        onDragUpdate: (duration) => setState(() => _draggingPosition = duration),
-                        onDragEnd: (_) {
-                          setState(() => _draggingPosition = null);
-                          _onUserInteraction();
-                        },
-                      );
-                    },
-                  );
-                },
-              ),
-            ],
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    StreamBuilder<Duration>(
+                      stream: player.stream.position,
+                      builder: (context, snapshot) {
+                        final position = _draggingPosition ?? snapshot.data ?? Duration.zero;
+                        final duration = player.state.duration;
+                        return Text(
+                          '${_formatDuration(position)} / ${_formatDuration(duration)}',
+                          style: const TextStyle(color: Colors.white),
+                        );
+                      },
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.fullscreen, color: Colors.white),
+                      onPressed: _toggleFullscreen,
+                    ),
+                  ],
+                ),
+                StreamBuilder<Duration>(
+                  stream: player.stream.position,
+                  builder: (context, snapshot) {
+                    final position = snapshot.data ?? Duration.zero;
+                    final duration = player.state.duration;
+                    return StreamBuilder<Duration>(
+                      stream: player.stream.buffer,
+                      builder: (context, snapshotBuffer) {
+                        final buffer = snapshotBuffer.data ?? Duration.zero;
+                        return VideoProgressBar(
+                          position: position,
+                          duration: duration,
+                          buffer: buffer,
+                          onSeek: (pos) {
+                            _onUserInteraction();
+                            player.seek(pos);
+                          },
+                          onDragStart: (_) => _cancelHideTimer(),
+                          onDragUpdate: (duration) => setState(() => _draggingPosition = duration),
+                          onDragEnd: (_) {
+                            setState(() => _draggingPosition = null);
+                            _onUserInteraction();
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -619,41 +627,14 @@ class _VideoPlayerControlsState extends State<VideoPlayerControls> with SingleTi
                     ),
 
                     // Volume Slider
-                    StreamBuilder<double>(
-                      stream: player.stream.volume,
-                      builder: (context, snapshot) {
-                        final volume = snapshot.data ?? 100.0;
-                        return Row(
-                          children: [
-                            IconButton(
-                              icon: Icon(volume == 0 ? Icons.volume_off : Icons.volume_up, color: Colors.white),
-                              onPressed: _toggleMute,
-                            ),
-                            SizedBox(
-                              width: 120,
-                              child: SliderTheme(
-                                data: SliderThemeData(
-                                  trackHeight: 2,
-                                  thumbShape: RoundSliderThumbShape(enabledThumbRadius: 8),
-                                  overlayShape: RoundSliderOverlayShape(overlayRadius: 16),
-                                ),
-                                child: Slider(
-                                  value: volume.clamp(0.0, 100.0),
-                                  min: 0.0,
-                                  max: 100.0,
-                                  onChanged: (val) {
-                                    _onUserInteraction();
-                                    player.setVolume(val);
-                                    if (val > 0) _lastVolume = val;
-                                  },
-                                  activeColor: Colors.white,
-                                  inactiveColor: Colors.white24,
-                                ),
-                              ),
-                            ),
-                          ],
-                        );
+                    _VolumeControl(
+                      volumeStream: player.stream.volume,
+                      onVolumeChanged: (val) {
+                        _onUserInteraction();
+                        player.setVolume(val);
+                        if (val > 0) _lastVolume = val;
                       },
+                      onMute: _toggleMute,
                     ),
                     const SizedBox(width: 16),
                     StreamBuilder<Duration>(
@@ -675,6 +656,15 @@ class _VideoPlayerControlsState extends State<VideoPlayerControls> with SingleTi
                         widget.onSettingsPressed();
                       },
                     ),
+                    if (widget.onShowEpisodes != null)
+                      IconButton(
+                        icon: const Icon(Icons.format_list_bulleted, color: Colors.white), // or grid_view
+                        tooltip: 'Episodes',
+                        onPressed: () {
+                          _onUserInteraction();
+                          widget.onShowEpisodes!();
+                        },
+                      ),
                     IconButton(
                       icon: Icon(Icons.fullscreen, color: Colors.white),
                       onPressed: _toggleFullscreen,
@@ -686,6 +676,86 @@ class _VideoPlayerControlsState extends State<VideoPlayerControls> with SingleTi
           ),
         ),
       ],
+    );
+  }
+}
+
+class _VolumeControl extends StatefulWidget {
+  final Stream<double> volumeStream;
+  final ValueChanged<double> onVolumeChanged;
+  final VoidCallback onMute;
+
+  const _VolumeControl({required this.volumeStream, required this.onVolumeChanged, required this.onMute});
+
+  @override
+  State<_VolumeControl> createState() => _VolumeControlState();
+}
+
+class _VolumeControlState extends State<_VolumeControl> {
+  bool _isHovering = false;
+  bool _isDragging = false;
+
+  void _onEnter(_) => setState(() => _isHovering = true);
+
+  void _onExit(_) => setState(() => _isHovering = false);
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: _onEnter,
+      onExit: _onExit,
+      child: StreamBuilder<double>(
+        stream: widget.volumeStream,
+        builder: (context, snapshot) {
+          final volume = snapshot.data ?? 100.0;
+          final showSlider = _isHovering || _isDragging;
+
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: Icon(volume == 0 ? Icons.volume_off : Icons.volume_up, color: Colors.white),
+                onPressed: widget.onMute,
+              ),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
+                width: showSlider ? 100 : 0,
+                height: 40,
+                child: ClipRect(
+                  child: OverflowBox(
+                    maxWidth: 100,
+                    minWidth: 100,
+                    alignment: Alignment.centerLeft,
+                    child: SliderTheme(
+                      data: SliderThemeData(
+                        trackHeight: 2,
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                        overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                        activeTrackColor: Colors.white,
+                        inactiveTrackColor: Colors.white24,
+                        thumbColor: Colors.white,
+                        overlayColor: Colors.white.withValues(alpha: 0.2),
+                      ),
+                      child: Slider(
+                        value: volume.clamp(0.0, 100.0),
+                        min: 0.0,
+                        max: 100.0,
+                        onChangeStart: (_) => setState(() => _isDragging = true),
+                        onChangeEnd: (_) => setState(() => _isDragging = false),
+                        onChanged: (val) {
+                          if (!_isDragging) setState(() => _isDragging = true);
+                          widget.onVolumeChanged(val);
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
