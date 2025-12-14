@@ -218,37 +218,39 @@ class _VideoPlayerViewState extends State<VideoPlayerView> {
 
             if (isPortrait) {
               // Mobile/Portrait Layout: Split View
-              return Column(
-                children: [
-                  AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child: _buildVideoPlayer(context, viewModel, showEpisodesButton: false),
-                  ),
-                  Expanded(
-                    child: Container(
-                      color: Theme.of(context).colorScheme.surface,
-                      child: ListenableBuilder(
-                        listenable: widget.detailViewModel,
-                        builder: (context, _) {
-                          return AnimeProviderContent(
-                            anime: widget.detailViewModel.anime,
-                            availableProviders: widget.detailViewModel.availableProviders,
-                            currentProvider: widget.detailViewModel.currentProviderName,
-                            getEpisodes: (p) => widget.detailViewModel.getEpisodesForProvider(p) ?? [],
-                            isProviderLoading: widget.detailViewModel.isProviderLoading,
-                            getEpisodeCount: widget.detailViewModel.getEpisodeCountForProvider,
-                            onProviderSelected: (index) {
-                              widget.detailViewModel.switchProvider(index);
-                            },
-                            errorMessage: widget.detailViewModel.errorMessage,
-                            onRetry: () => widget.detailViewModel.loadAnime(forceRefresh: true),
-                            onEpisodeTap: _onEpisodeTap,
-                          );
-                        },
+              return SafeArea(
+                child: Column(
+                  children: [
+                    AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: _buildVideoPlayer(context, viewModel, showEpisodesButton: false, bottomSafeArea: false),
+                    ),
+                    Expanded(
+                      child: Container(
+                        color: Theme.of(context).colorScheme.surface,
+                        child: ListenableBuilder(
+                          listenable: widget.detailViewModel,
+                          builder: (context, _) {
+                            return AnimeProviderContent(
+                              anime: widget.detailViewModel.anime,
+                              availableProviders: widget.detailViewModel.availableProviders,
+                              currentProvider: widget.detailViewModel.currentProviderName,
+                              getEpisodes: (p) => widget.detailViewModel.getEpisodesForProvider(p) ?? [],
+                              isProviderLoading: widget.detailViewModel.isProviderLoading,
+                              getEpisodeCount: widget.detailViewModel.getEpisodeCountForProvider,
+                              onProviderSelected: (index) {
+                                widget.detailViewModel.switchProvider(index);
+                              },
+                              errorMessage: widget.detailViewModel.errorMessage,
+                              onRetry: () => widget.detailViewModel.loadAnime(forceRefresh: true),
+                              onEpisodeTap: _onEpisodeTap,
+                            );
+                          },
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               );
             } else {
               // Desktop/Landscape Layout: Fullscreen with Overlay Sheet
@@ -260,7 +262,12 @@ class _VideoPlayerViewState extends State<VideoPlayerView> {
     );
   }
 
-  Widget _buildVideoPlayer(BuildContext context, VideoPlayerViewModel viewModel, {required bool showEpisodesButton}) {
+  Widget _buildVideoPlayer(
+    BuildContext context,
+    VideoPlayerViewModel viewModel, {
+    required bool showEpisodesButton,
+    bool bottomSafeArea = true,
+  }) {
     return Stack(
       alignment: Alignment.center,
       children: [
@@ -276,6 +283,7 @@ class _VideoPlayerViewState extends State<VideoPlayerView> {
                 onSettingsPressed: () => _showSettings(context),
                 feedbackStream: viewModel.feedbackStream,
                 onShowEpisodes: showEpisodesButton ? _showEpisodesSheet : null,
+                bottomSafeArea: bottomSafeArea,
               ),
             ),
             if (_isLoadingEpisode)

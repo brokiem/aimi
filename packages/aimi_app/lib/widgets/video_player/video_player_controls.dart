@@ -21,6 +21,7 @@ class VideoPlayerControls extends StatefulWidget {
   final VoidCallback onSettingsPressed;
   final Stream<VideoFeedbackEvent> feedbackStream;
   final VoidCallback? onShowEpisodes;
+  final bool bottomSafeArea;
 
   const VideoPlayerControls({
     super.key,
@@ -30,6 +31,7 @@ class VideoPlayerControls extends StatefulWidget {
     required this.onSettingsPressed,
     required this.feedbackStream,
     this.onShowEpisodes,
+    this.bottomSafeArea = true,
   });
 
   @override
@@ -480,6 +482,7 @@ class _VideoPlayerControlsState extends State<VideoPlayerControls> with SingleTi
           ),
           child: SafeArea(
             top: false,
+            bottom: widget.bottomSafeArea,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
