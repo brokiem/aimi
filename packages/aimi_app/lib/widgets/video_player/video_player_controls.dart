@@ -65,7 +65,10 @@ class _VideoPlayerControlsState extends State<VideoPlayerControls> with SingleTi
   DateTime? _lastTapTime;
   Offset? _lastTapPosition;
 
-  bool get _isDesktop {
+  // Cache platform check to avoid repeated try-catch
+  static final bool _isDesktop = _checkIsDesktop();
+
+  static bool _checkIsDesktop() {
     try {
       return Platform.isWindows || Platform.isLinux || Platform.isMacOS;
     } catch (e) {
@@ -402,8 +405,10 @@ class _VideoPlayerControlsState extends State<VideoPlayerControls> with SingleTi
               ),
               // Internal feedback for fullscreen support
               Positioned.fill(
-                child: Center(
-                  child: VideoShortcutFeedback(visible: _feedbackVisible, icon: _feedbackIcon, label: _feedbackLabel),
+                child: RepaintBoundary(
+                  child: Center(
+                    child: VideoShortcutFeedback(visible: _feedbackVisible, icon: _feedbackIcon, label: _feedbackLabel),
+                  ),
                 ),
               ),
             ],
@@ -489,49 +494,29 @@ class _VideoPlayerControlsState extends State<VideoPlayerControls> with SingleTi
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    StreamBuilder<Duration>(
-                      stream: player.stream.position,
-                      builder: (context, snapshot) {
-                        final position = _draggingPosition ?? snapshot.data ?? Duration.zero;
-                        final duration = player.state.duration;
-                        return Text(
-                          '${_formatDuration(position)} / ${_formatDuration(duration)}',
-                          style: const TextStyle(color: Colors.white),
-                        );
-                      },
+                    _PositionDisplay(
+                      positionStream: player.stream.position,
+                      duration: player.state.duration,
+                      draggingPosition: _draggingPosition,
+                      formatDuration: _formatDuration,
                     ),
                     IconButton(
-                      icon: Icon(Icons.fullscreen, color: Colors.white),
+                      icon: const Icon(Icons.fullscreen, color: Colors.white),
                       onPressed: _toggleFullscreen,
                     ),
                   ],
                 ),
-                StreamBuilder<Duration>(
-                  stream: player.stream.position,
-                  builder: (context, snapshot) {
-                    final position = snapshot.data ?? Duration.zero;
-                    final duration = player.state.duration;
-                    return StreamBuilder<Duration>(
-                      stream: player.stream.buffer,
-                      builder: (context, snapshotBuffer) {
-                        final buffer = snapshotBuffer.data ?? Duration.zero;
-                        return VideoProgressBar(
-                          position: position,
-                          duration: duration,
-                          buffer: buffer,
-                          onSeek: (pos) {
-                            _onUserInteraction();
-                            player.seek(pos);
-                          },
-                          onDragStart: (_) => _cancelHideTimer(),
-                          onDragUpdate: (duration) => setState(() => _draggingPosition = duration),
-                          onDragEnd: (_) {
-                            setState(() => _draggingPosition = null);
-                            _onUserInteraction();
-                          },
-                        );
-                      },
-                    );
+                _ProgressBarWithBuffer(
+                  player: player,
+                  onSeek: (pos) {
+                    _onUserInteraction();
+                    player.seek(pos);
+                  },
+                  onDragStart: (_) => _cancelHideTimer(),
+                  onDragUpdate: (duration) => setState(() => _draggingPosition = duration),
+                  onDragEnd: (_) {
+                    setState(() => _draggingPosition = null);
+                    _onUserInteraction();
                   },
                 ),
               ],
@@ -586,38 +571,21 @@ class _VideoPlayerControlsState extends State<VideoPlayerControls> with SingleTi
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              StreamBuilder<Duration>(
-                stream: player.stream.position,
-                builder: (context, snapshot) {
-                  final position = snapshot.data ?? Duration.zero;
-                  final duration = player.state.duration;
-                  return StreamBuilder<Duration>(
-                    stream: player.stream.buffer,
-                    builder: (context, snapshotBuffer) {
-                      final buffer = snapshotBuffer.data ?? Duration.zero;
-                      return VideoProgressBar(
-                        position: position,
-                        duration: duration,
-                        buffer: buffer,
-                        onSeek: (pos) {
-                          _onUserInteraction();
-                          player.seek(pos);
-                        },
-                        onDragStart: (_) => _cancelHideTimer(),
-                        onDragUpdate: (duration) => setState(() => _draggingPosition = duration),
-                        onDragEnd: (_) {
-                          setState(() => _draggingPosition = null);
-                          _onUserInteraction();
-                        },
-                      );
-                    },
-                  );
+              _ProgressBarWithBuffer(
+                player: player,
+                onSeek: (pos) {
+                  _onUserInteraction();
+                  player.seek(pos);
+                },
+                onDragStart: (_) => _cancelHideTimer(),
+                onDragUpdate: (duration) => setState(() => _draggingPosition = duration),
+                onDragEnd: (_) {
+                  setState(() => _draggingPosition = null);
+                  _onUserInteraction();
                 },
               ),
               Theme(
-                data: Theme.of(
-                  context,
-                ).copyWith(iconTheme: const IconThemeData(size: 28, color: Colors.white)), // Bigger buttons
+                data: Theme.of(context).copyWith(iconTheme: const IconThemeData(size: 28, color: Colors.white)),
                 child: Row(
                   children: [
                     IconButton(
@@ -628,8 +596,6 @@ class _VideoPlayerControlsState extends State<VideoPlayerControls> with SingleTi
                       ),
                       onPressed: player.playOrPause,
                     ),
-
-                    // Volume Slider
                     _VolumeControl(
                       volumeStream: player.stream.volume,
                       onVolumeChanged: (val) {
@@ -640,16 +606,11 @@ class _VideoPlayerControlsState extends State<VideoPlayerControls> with SingleTi
                       onMute: _toggleMute,
                     ),
                     const SizedBox(width: 16),
-                    StreamBuilder<Duration>(
-                      stream: player.stream.position,
-                      builder: (context, snapshot) {
-                        final position = _draggingPosition ?? snapshot.data ?? Duration.zero;
-                        final duration = player.state.duration;
-                        return Text(
-                          '${_formatDuration(position)} / ${_formatDuration(duration)}',
-                          style: const TextStyle(color: Colors.white),
-                        );
-                      },
+                    _PositionDisplay(
+                      positionStream: player.stream.position,
+                      duration: player.state.duration,
+                      draggingPosition: _draggingPosition,
+                      formatDuration: _formatDuration,
                     ),
                     const Spacer(),
                     IconButton(
@@ -661,7 +622,7 @@ class _VideoPlayerControlsState extends State<VideoPlayerControls> with SingleTi
                     ),
                     if (widget.onShowEpisodes != null)
                       IconButton(
-                        icon: const Icon(Icons.format_list_bulleted, color: Colors.white), // or grid_view
+                        icon: const Icon(Icons.format_list_bulleted, color: Colors.white),
                         tooltip: 'Episodes',
                         onPressed: () {
                           _onUserInteraction();
@@ -669,7 +630,7 @@ class _VideoPlayerControlsState extends State<VideoPlayerControls> with SingleTi
                         },
                       ),
                     IconButton(
-                      icon: Icon(Icons.fullscreen, color: Colors.white),
+                      icon: const Icon(Icons.fullscreen, color: Colors.white),
                       onPressed: _toggleFullscreen,
                     ),
                   ],
@@ -679,6 +640,78 @@ class _VideoPlayerControlsState extends State<VideoPlayerControls> with SingleTi
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Extracted widget for position display to reduce rebuilds
+class _PositionDisplay extends StatelessWidget {
+  final Stream<Duration> positionStream;
+  final Duration duration;
+  final Duration? draggingPosition;
+  final String Function(Duration) formatDuration;
+
+  const _PositionDisplay({
+    required this.positionStream,
+    required this.duration,
+    required this.draggingPosition,
+    required this.formatDuration,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<Duration>(
+      stream: positionStream,
+      builder: (context, snapshot) {
+        final position = draggingPosition ?? snapshot.data ?? Duration.zero;
+        return Text(
+          '${formatDuration(position)} / ${formatDuration(duration)}',
+          style: const TextStyle(color: Colors.white),
+        );
+      },
+    );
+  }
+}
+
+/// Extracted widget for progress bar with buffer to reduce rebuilds
+class _ProgressBarWithBuffer extends StatelessWidget {
+  final Player player;
+  final ValueChanged<Duration> onSeek;
+  final ValueChanged<Duration>? onDragStart;
+  final ValueChanged<Duration>? onDragUpdate;
+  final ValueChanged<Duration>? onDragEnd;
+
+  const _ProgressBarWithBuffer({
+    required this.player,
+    required this.onSeek,
+    this.onDragStart,
+    this.onDragUpdate,
+    this.onDragEnd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<Duration>(
+      stream: player.stream.position,
+      builder: (context, snapshot) {
+        final position = snapshot.data ?? Duration.zero;
+        final duration = player.state.duration;
+        return StreamBuilder<Duration>(
+          stream: player.stream.buffer,
+          builder: (context, snapshotBuffer) {
+            final buffer = snapshotBuffer.data ?? Duration.zero;
+            return VideoProgressBar(
+              position: position,
+              duration: duration,
+              buffer: buffer,
+              onSeek: onSeek,
+              onDragStart: onDragStart,
+              onDragUpdate: onDragUpdate,
+              onDragEnd: onDragEnd,
+            );
+          },
+        );
+      },
     );
   }
 }
