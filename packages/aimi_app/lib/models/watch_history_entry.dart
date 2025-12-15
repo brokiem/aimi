@@ -27,7 +27,7 @@ class WatchHistoryEntry {
   /// When this entry was last updated
   final DateTime lastWatched;
 
-  /// True if the episode was watched to completion (>90%)
+  /// True if the episode was watched to completion (>96%)
   final bool isCompleted;
 
   /// Optional anime title for display purposes

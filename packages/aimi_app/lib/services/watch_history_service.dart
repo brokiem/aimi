@@ -15,8 +15,8 @@ class WatchHistoryService {
   /// Maximum number of entries to keep in history
   static const int _maxHistoryEntries = 100;
 
-  /// Threshold for marking an episode as completed (90%)
-  static const double completionThreshold = 0.9;
+  /// Threshold for marking an episode as completed (96%)
+  static const double completionThreshold = 0.96;
 
   WatchHistoryService(this._cachingService);
 
