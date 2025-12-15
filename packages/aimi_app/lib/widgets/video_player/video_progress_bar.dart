@@ -302,11 +302,9 @@ class _ProgressBarPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (duration.inMilliseconds == 0) return;
-
     final double totalMs = duration.inMilliseconds.toDouble();
-    final double positionValue = (position.inMilliseconds / totalMs).clamp(0.0, 1.0);
-    final double bufferValue = (buffer.inMilliseconds / totalMs).clamp(0.0, 1.0);
+    final double positionValue = totalMs == 0 ? 0.0 : (position.inMilliseconds / totalMs).clamp(0.0, 1.0);
+    final double bufferValue = totalMs == 0 ? 0.0 : (buffer.inMilliseconds / totalMs).clamp(0.0, 1.0);
 
     final bgPaint = _getPaint(backgroundColor);
     final bufferPaint = _getPaint(bufferedColor);
