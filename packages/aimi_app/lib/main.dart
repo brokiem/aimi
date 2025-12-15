@@ -23,33 +23,6 @@ import 'package:scroll_animator/scroll_animator.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (Platform.isAndroid) {
-    final deviceInfo = await DeviceInfoPlugin().androidInfo;
-    if (deviceInfo.version.sdkInt >= 33 /* Android 13 or higher. */ ) {
-      // Video permissions.
-      if (await Permission.videos.isDenied || await Permission.videos.isPermanentlyDenied) {
-        final state = await Permission.videos.request();
-        if (!state.isGranted) {
-          await SystemNavigator.pop();
-        }
-      }
-      // Audio permissions.
-      if (await Permission.audio.isDenied || await Permission.audio.isPermanentlyDenied) {
-        final state = await Permission.audio.request();
-        if (!state.isGranted) {
-          await SystemNavigator.pop();
-        }
-      }
-    } else {
-      if (await Permission.storage.isDenied || await Permission.storage.isPermanentlyDenied) {
-        final state = await Permission.storage.request();
-        if (!state.isGranted) {
-          await SystemNavigator.pop();
-        }
-      }
-    }
-  }
-
   // Initialize media_kit
   MediaKit.ensureInitialized();
 
