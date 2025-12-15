@@ -202,8 +202,8 @@ class ProviderTab extends StatelessWidget {
           if (isLoading && episodeCount == 0) ...[
             const SizedBox(width: 8),
             SizedBox(
-              width: 16,
-              height: 16,
+              width: 24,
+              height: 24,
               child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.primary),
             ),
           ] else if (episodeCount > 0) ...[
@@ -608,7 +608,7 @@ class EpisodeThumbnail extends StatelessWidget {
                         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
                         child: LinearProgressIndicator(
                           value: progress,
-                          backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                          backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.8),
                           valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
                           minHeight: 4,
                         ),

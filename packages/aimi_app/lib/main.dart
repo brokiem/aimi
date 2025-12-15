@@ -104,8 +104,8 @@ class AimiApp extends StatelessWidget {
               ),
             ).textTheme,
           ),
-          progressIndicatorTheme: const ProgressIndicatorThemeData(),
-
+          progressIndicatorTheme: const ProgressIndicatorThemeData(year2023: false),
+          sliderTheme: const SliderThemeData(year2023: false),
           useMaterial3: true,
         ),
         shortcuts: {
