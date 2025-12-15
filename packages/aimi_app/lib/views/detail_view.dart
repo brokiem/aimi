@@ -223,7 +223,9 @@ class _DetailViewState extends State<DetailView> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final detailViewModel = context.watch<DetailViewModel>();
+    // Use read instead of watch - anime data is static after navigation
+    // The sidebar/bottom sheet has its own Consumer for reactive updates
+    final detailViewModel = context.read<DetailViewModel>();
     final anime = detailViewModel.anime;
 
     return LayoutBuilder(

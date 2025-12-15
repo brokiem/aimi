@@ -254,18 +254,21 @@ class ProviderEpisodeList extends StatefulWidget {
   State<ProviderEpisodeList> createState() => _ProviderEpisodeListState();
 }
 
-class _ProviderEpisodeListState extends State<ProviderEpisodeList> {
+class _ProviderEpisodeListState extends State<ProviderEpisodeList> with AutomaticKeepAliveClientMixin {
   Map<String, WatchHistoryEntry> _watchProgress = {};
   bool _loadingWatchHistory = false;
   StreamSubscription<WatchHistoryEntry>? _progressSubscription;
-  List<AnimeEpisode>? _lastEpisodes;
+  Timer? _debounceTimer;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
     final watchHistoryService = context.read<WatchHistoryService>();
     _progressSubscription = watchHistoryService.onProgressUpdated.listen(_onProgressUpdated);
-    // Initial load
+    // Initial load after frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadWatchHistory();
     });
@@ -274,23 +277,55 @@ class _ProviderEpisodeListState extends State<ProviderEpisodeList> {
   @override
   void didUpdateWidget(ProviderEpisodeList oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Reload if scrolling became active or other inputs changed drastically
-    // Usually episodes update via VM listener below, but we need to check if episodes changed
+    // Reload if episodes changed (e.g., provider switch loaded new episodes)
+    if (widget.episodes.length != oldWidget.episodes.length ||
+        (widget.episodes.isNotEmpty &&
+            oldWidget.episodes.isNotEmpty &&
+            widget.episodes.first.id != oldWidget.episodes.first.id)) {
+      _scheduleWatchHistoryLoad();
+    }
   }
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _progressSubscription?.cancel();
     super.dispose();
   }
 
+  /// Schedule a debounced watch history load to prevent multiple rapid calls.
+  void _scheduleWatchHistoryLoad() {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 100), () {
+      if (mounted) _loadWatchHistory();
+    });
+  }
+
+  /// Handle progress updates from the stream.
+  /// Matches by episode number for cross-provider sync.
   void _onProgressUpdated(WatchHistoryEntry entry) {
     if (entry.animeId != widget.anime.id) return;
-    if (entry.streamProviderName != widget.providerName) return;
 
-    if (mounted) {
+    if (!mounted) return;
+
+    // Find matching episode by number (cross-provider sync)
+    // or by exact ID (same provider)
+    String? matchingEpisodeId;
+    for (final episode in widget.episodes) {
+      if (entry.streamProviderName == widget.providerName && entry.episodeId == episode.id) {
+        // Exact match (same provider, same ID)
+        matchingEpisodeId = episode.id;
+        break;
+      } else if (entry.episodeNumber == episode.number) {
+        // Cross-provider match (same episode number)
+        matchingEpisodeId = episode.id;
+        // Don't break - prefer exact match if found later
+      }
+    }
+
+    if (matchingEpisodeId != null) {
       setState(() {
-        _watchProgress[entry.episodeId] = entry;
+        _watchProgress[matchingEpisodeId!] = entry;
       });
     }
   }
@@ -299,18 +334,19 @@ class _ProviderEpisodeListState extends State<ProviderEpisodeList> {
     if (_loadingWatchHistory) return;
 
     final episodes = widget.episodes;
-
     if (episodes.isEmpty) return;
 
-    setState(() => _loadingWatchHistory = true);
+    _loadingWatchHistory = true;
 
     try {
       final watchHistoryService = context.read<WatchHistoryService>();
       final Map<String, WatchHistoryEntry> progressMap = {};
 
       for (final episode in episodes) {
+        // Try exact provider match first
         var entry = await watchHistoryService.getProgress(widget.providerName, widget.anime.id, episode.id);
 
+        // Then try cross-provider sync by episode number
         final syncedEntry = await watchHistoryService.findLatestProgress(widget.anime.id, episode.number);
 
         if (syncedEntry != null) {
@@ -341,12 +377,15 @@ class _ProviderEpisodeListState extends State<ProviderEpisodeList> {
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _loadingWatchHistory = false);
+      if (mounted) {
+        setState(() => _loadingWatchHistory = false);
+      }
     }
   }
 
   Future<void> _handleEpisodeTap(AnimeEpisode episode) async {
     await widget.onEpisodeTap(episode);
+    // Reload watch history after returning from video player
     if (mounted) {
       _loadingWatchHistory = false;
       await _loadWatchHistory();
@@ -359,25 +398,12 @@ class _ProviderEpisodeListState extends State<ProviderEpisodeList> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+
     final episodes = widget.episodes;
     final isLoading = widget.isLoading;
 
-    // Reload history if episodes list instance changed and is valid
-    if (episodes != _lastEpisodes) {
-      _lastEpisodes = episodes;
-      if (episodes.isNotEmpty && !_loadingWatchHistory) {
-        Future.microtask(_loadWatchHistory);
-      }
-    }
-
     if (episodes.isNotEmpty) {
-      // Check if we need to load history for these new episodes
-      // Simple check: if map is empty but we have episodes, load history
-      if (_watchProgress.isEmpty && !_loadingWatchHistory) {
-        // Using a microtask to avoid setState during build
-        Future.microtask(_loadWatchHistory);
-      }
-
       return EpisodeList(
         episodes: episodes,
         watchProgress: _watchProgress,
@@ -396,11 +422,11 @@ class _ProviderEpisodeListState extends State<ProviderEpisodeList> {
     final isCurrent = widget.isCurrentProvider;
     final error = isCurrent ? widget.errorMessage : null;
 
-    if (episodes.isEmpty) {
-      return const Center(child: Text('No episodes available'));
+    if (error != null) {
+      return ErrorView(message: error, onRetry: isCurrent ? _retry : null);
     }
 
-    return ErrorView(message: error ?? 'Failed to load', onRetry: isCurrent ? _retry : null);
+    return const Center(child: Text('No episodes available'));
   }
 }
 
