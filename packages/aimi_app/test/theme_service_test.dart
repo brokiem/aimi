@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  group('ThemeService Tests', () {
+  group('ThemeService', () {
     late ThemeService themeService;
     late PreferencesService preferencesService;
 
@@ -14,37 +14,169 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       preferencesService = PreferencesService();
       themeService = ThemeService(preferencesService);
-      // Wait for async constructor load logic if any, but ThemeService loads in constructor via async method which is unawaited.
-      // Ideally we should wait, but for now we'll test the setter/getter interactions.
-      // A better design would be to have an init method we can await, but for this simple service we can just test the state changes.
     });
 
-    test('Initial state is default', () {
-      expect(themeService.themeMode, ThemeMode.system);
-      expect(themeService.seedColor, Colors.teal);
+    // =========================================================================
+    // Initial State Tests
+    // =========================================================================
+    group('Initial State', () {
+      test('initial themeMode is system', () {
+        expect(themeService.themeMode, ThemeMode.system);
+      });
+
+      test('initial seedColor is teal', () {
+        expect(themeService.seedColor, Colors.teal);
+      });
     });
 
-    test('Setting theme mode updates state and notifies listeners', () async {
-      bool notified = false;
-      themeService.addListener(() => notified = true);
+    // =========================================================================
+    // Theme Mode Tests
+    // =========================================================================
+    group('Theme Mode', () {
+      test('setThemeMode updates state', () async {
+        await themeService.setThemeMode(ThemeMode.dark);
+        expect(themeService.themeMode, ThemeMode.dark);
+      });
 
-      await themeService.setThemeMode(ThemeMode.dark);
+      test('setThemeMode notifies listeners', () async {
+        bool notified = false;
+        themeService.addListener(() => notified = true);
 
-      expect(themeService.themeMode, ThemeMode.dark);
-      expect(notified, true);
+        await themeService.setThemeMode(ThemeMode.dark);
+
+        expect(notified, true);
+      });
+
+      test('setThemeMode to light mode works', () async {
+        await themeService.setThemeMode(ThemeMode.light);
+        expect(themeService.themeMode, ThemeMode.light);
+      });
+
+      test('setThemeMode to system mode works', () async {
+        await themeService.setThemeMode(ThemeMode.dark);
+        await themeService.setThemeMode(ThemeMode.system);
+        expect(themeService.themeMode, ThemeMode.system);
+      });
     });
 
-    test('Setting seed color updates state and notifies listeners', () async {
-      bool notified = false;
-      themeService.addListener(() => notified = true);
+    // =========================================================================
+    // Seed Color Tests
+    // =========================================================================
+    group('Seed Color', () {
+      test('setSeedColor updates state', () async {
+        await themeService.setSeedColor(Colors.red);
+        expect(themeService.seedColor, Colors.red);
+      });
 
-      await themeService.setSeedColor(Colors.red);
+      test('setSeedColor notifies listeners', () async {
+        bool notified = false;
+        themeService.addListener(() => notified = true);
 
-      expect(themeService.seedColor, Colors.red);
-      expect(notified, true);
+        await themeService.setSeedColor(Colors.red);
+
+        expect(notified, true);
+      });
+
+      test('setSeedColor works with various colors', () async {
+        final colors = [Colors.blue, Colors.purple, Colors.green, Colors.orange, Colors.pink];
+
+        for (final color in colors) {
+          await themeService.setSeedColor(color);
+          expect(themeService.seedColor, color);
+        }
+      });
     });
 
-    // We can't easily test persistence without mocking SharedPreferences more thoroughly or refactoring,
-    // but this covers the core logic of the service.
+    // =========================================================================
+    // Listener Tests
+    // =========================================================================
+    group('Listeners', () {
+      test('multiple listeners are notified on change', () async {
+        // Wait for async constructor initialization to complete
+        await Future.delayed(const Duration(milliseconds: 50));
+
+        int notifyCount = 0;
+        themeService.addListener(() => notifyCount++);
+        themeService.addListener(() => notifyCount++);
+
+        await themeService.setThemeMode(ThemeMode.dark);
+
+        expect(notifyCount, 2);
+      });
+
+      test('removed listener is not notified', () async {
+        bool notified = false;
+        void listener() => notified = true;
+
+        themeService.addListener(listener);
+        themeService.removeListener(listener);
+
+        await themeService.setThemeMode(ThemeMode.dark);
+
+        expect(notified, false);
+      });
+    });
+
+    // =========================================================================
+    // Persistence Tests
+    // =========================================================================
+    group('Persistence', () {
+      test('themeMode persists across service instances', () async {
+        // Set dark mode
+        await themeService.setThemeMode(ThemeMode.dark);
+
+        // Create new service instance
+        final newService = ThemeService(preferencesService);
+
+        // Wait for async load
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        expect(newService.themeMode, ThemeMode.dark);
+      });
+
+      test('seedColor persists across service instances', () async {
+        // Set custom color (use a simple Color, not MaterialColor)
+        const testColor = Color(0xFF9C27B0); // Purple
+        await themeService.setSeedColor(testColor);
+
+        // Create new service instance
+        final newService = ThemeService(preferencesService);
+
+        // Wait for async load
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        // Compare color values (not MaterialColor vs Color)
+        expect(newService.seedColor.value, testColor.value);
+      });
+    });
+
+    // =========================================================================
+    // Edge Cases
+    // =========================================================================
+    group('Edge Cases', () {
+      test('setting same themeMode does not notify listeners', () async {
+        await themeService.setThemeMode(ThemeMode.dark);
+
+        bool notified = false;
+        themeService.addListener(() => notified = true);
+
+        await themeService.setThemeMode(ThemeMode.dark);
+
+        // Service optimizes by not notifying on same value
+        expect(notified, false);
+      });
+
+      test('setting same seedColor does not notify listeners', () async {
+        await themeService.setSeedColor(Colors.red);
+
+        bool notified = false;
+        themeService.addListener(() => notified = true);
+
+        await themeService.setSeedColor(Colors.red);
+
+        // Service optimizes by not notifying on same value
+        expect(notified, false);
+      });
+    });
   });
 }
