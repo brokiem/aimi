@@ -121,8 +121,8 @@ class _DetailViewState extends State<DetailView> with TickerProviderStateMixin {
 
         if (context.mounted) {
           await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) {
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) {
                 return VideoPlayerView(
                   sources: sources,
                   episodeTitle: 'Episode ${episode.number}',
@@ -135,6 +135,17 @@ class _DetailViewState extends State<DetailView> with TickerProviderStateMixin {
                   metadataProviderName: animeService.providerName,
                 );
               },
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                const begin = Offset(0.0, 1.0);
+                const end = Offset.zero;
+                const curve = Curves.easeOutCubic;
+
+                var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+
+                return SlideTransition(position: animation.drive(tween), child: child);
+              },
+              transitionDuration: const Duration(milliseconds: 300),
+              reverseTransitionDuration: const Duration(milliseconds: 300),
             ),
           );
         }
