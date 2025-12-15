@@ -50,6 +50,8 @@ dependencies:
   device_info_plus: ^12.3.0
   cached_network_image: ^3.4.1
   path_provider: ^2.1.5
+  hive_ce: ^2.15.1
+  hive_ce_flutter: ^2.3.3
 
 dev_dependencies:
   flutter_test:

@@ -14,6 +14,7 @@ import 'package:aimi_lib/aimi_lib.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:hive_ce_flutter/adapters.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:provider/provider.dart';
 import 'package:scroll_animator/scroll_animator.dart';
@@ -23,6 +24,8 @@ void main() async {
 
   // Initialize media_kit
   MediaKit.ensureInitialized();
+
+  await Hive.initFlutter();
 
   runApp(const AimiApp());
 }

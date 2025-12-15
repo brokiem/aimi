@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hive_ce_flutter/hive_flutter.dart';
 
 /// Strongly-typed keys for cache data.
 /// These are temporary data that may expire.
@@ -19,6 +19,18 @@ enum CacheKey {
 ///
 /// For user preferences/settings, use [PreferencesService] instead.
 class CachingService {
+  static const String _boxName = 'aimi_cache';
+  LazyBox<String>? _box;
+
+  /// Gets or opens the Hive lazy box for caching.
+  Future<LazyBox<String>> _getBox() async {
+    if (_box != null && _box!.isOpen) {
+      return _box!;
+    }
+    _box = await Hive.openLazyBox<String>(_boxName);
+    return _box!;
+  }
+
   /// Save data with optional expiration.
   ///
   /// Use [cacheKey] for predefined keys, or [dynamicKey] for runtime-generated keys
@@ -32,14 +44,14 @@ class CachingService {
   }) async {
     assert(cacheKey != null || dynamicKey != null, 'Either cacheKey or dynamicKey must be provided');
 
-    final prefs = await SharedPreferences.getInstance();
+    final box = await _getBox();
     final cacheData = {
       'data': data,
       'timestamp': expiresIn != null ? DateTime.now().add(expiresIn).toIso8601String() : null,
     };
     final key = cacheKey?.name ?? dynamicKey!;
     final fullKey = _generateKey(key, providerName);
-    await prefs.setString(fullKey, jsonEncode(cacheData));
+    await box.put(fullKey, jsonEncode(cacheData));
   }
 
   /// Get cached data.
@@ -48,10 +60,10 @@ class CachingService {
   Future<dynamic> getData({CacheKey? cacheKey, String? dynamicKey, String? providerName}) async {
     assert(cacheKey != null || dynamicKey != null, 'Either cacheKey or dynamicKey must be provided');
 
-    final prefs = await SharedPreferences.getInstance();
+    final box = await _getBox();
     final key = cacheKey?.name ?? dynamicKey!;
     final fullKey = _generateKey(key, providerName);
-    final cachedData = prefs.getString(fullKey);
+    final cachedData = await box.get(fullKey);
 
     if (cachedData != null) {
       final decodedData = jsonDecode(cachedData);
@@ -70,10 +82,10 @@ class CachingService {
   Future<void> removeData({CacheKey? cacheKey, String? dynamicKey, String? providerName}) async {
     assert(cacheKey != null || dynamicKey != null, 'Either cacheKey or dynamicKey must be provided');
 
-    final prefs = await SharedPreferences.getInstance();
+    final box = await _getBox();
     final key = cacheKey?.name ?? dynamicKey!;
     final fullKey = _generateKey(key, providerName);
-    await prefs.remove(fullKey);
+    await box.delete(fullKey);
   }
 
   String _generateKey(String key, String? providerName) {
