@@ -6,9 +6,10 @@ import 'package:aimi_app/services/streaming_service.dart';
 import 'package:aimi_app/services/theme_service.dart';
 import 'package:aimi_app/services/thumbnail_service.dart';
 import 'package:aimi_app/services/watch_history_service.dart';
+import 'package:aimi_app/viewmodels/history_viewmodel.dart';
 import 'package:aimi_app/viewmodels/home_viewmodel.dart';
 import 'package:aimi_app/viewmodels/search_viewmodel.dart';
-import 'package:aimi_app/views/home_view.dart';
+import 'package:aimi_app/views/main_view.dart';
 import 'package:aimi_lib/aimi_lib.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -55,7 +56,8 @@ class AimiApp extends StatelessWidget {
         Provider<WatchHistoryService>.value(value: watchHistoryService),
         ChangeNotifierProvider<ThemeService>.value(value: themeService),
         Provider<ThumbnailService>.value(value: thumbnailService),
-        ChangeNotifierProvider(create: (_) => HomeViewModel(animeService, watchHistoryService)),
+        ChangeNotifierProvider(create: (_) => HomeViewModel(animeService)),
+        ChangeNotifierProvider(create: (_) => HistoryViewModel(watchHistoryService, animeService)),
         ChangeNotifierProvider(create: (_) => SearchViewModel(animeService)),
       ],
       child: Consumer<ThemeService>(
@@ -110,7 +112,7 @@ class AimiApp extends StatelessWidget {
               const SingleActivator(LogicalKeyboardKey.arrowRight): const ScrollIntent(direction: AxisDirection.right),
             },
             actions: {...WidgetsApp.defaultActions, ScrollIntent: AnimatedScrollAction()},
-            home: const HomeView(),
+            home: const MainView(),
           );
         },
       ),

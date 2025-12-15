@@ -1,5 +1,5 @@
 import 'package:aimi_app/models/anime.dart';
-import 'package:aimi_app/viewmodels/home_viewmodel.dart';
+import 'package:aimi_app/viewmodels/history_viewmodel.dart';
 import 'package:aimi_app/views/detail_view.dart';
 import 'package:aimi_app/widgets/anime_grid_tile.dart';
 import 'package:aimi_app/widgets/common/error_view.dart';
@@ -7,37 +7,24 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:scroll_animator/scroll_animator.dart';
 
-class HomeView extends StatefulWidget {
-  const HomeView({super.key});
+class HistoryView extends StatefulWidget {
+  const HistoryView({super.key});
 
   @override
-  State<HomeView> createState() => _HomeViewState();
+  State<HistoryView> createState() => _HistoryViewState();
 }
 
-class _HomeViewState extends State<HomeView> {
+class _HistoryViewState extends State<HistoryView> {
   final _scrollController = AnimatedScrollController(animationFactory: const ChromiumEaseInOut());
-  bool _fetchHasError = false;
 
   @override
   void initState() {
     super.initState();
-    final homeViewModel = Provider.of<HomeViewModel>(context, listen: false);
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (homeViewModel.trendingAnime.isEmpty) {
-        homeViewModel.fetchTrending().catchError((e) {
-          if (mounted) {
-            setState(() => _fetchHasError = true);
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-          }
-        });
-      }
-    });
-
-    _scrollController.addListener(() {
-      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 300 &&
-          !homeViewModel.isLoading) {
-        homeViewModel.loadMoreTrendingAnime().catchError((e) => homeViewModel.loadMoreTrendingAnime());
+      final viewModel = Provider.of<HistoryViewModel>(context, listen: false);
+      // Logic from HomeView: fetch history if empty
+      if (viewModel.watchHistory.isEmpty) {
+        viewModel.fetchWatchHistory();
       }
     });
   }
@@ -54,18 +41,35 @@ class _HomeViewState extends State<HomeView> {
 
   @override
   Widget build(BuildContext context) {
-    final homeViewModel = Provider.of<HomeViewModel>(context);
+    final viewModel = Provider.of<HistoryViewModel>(context);
     final isMobile = MediaQuery.of(context).size.width < 640;
 
-    if (_fetchHasError) {
-      return ErrorView(
-        message: "Failed to fetch trending anime.",
-        onRetry: () {
-          setState(() => _fetchHasError = false);
-          homeViewModel.fetchTrending().catchError((e) {
-            if (mounted) setState(() => _fetchHasError = true);
-          });
-        },
+    if (viewModel.historyError != null) {
+      return ErrorView(message: viewModel.historyError!, onRetry: () => viewModel.fetchWatchHistory());
+    }
+
+    if (viewModel.watchedAnime.isEmpty && !viewModel.isLoadingHistory) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.history, size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+            const SizedBox(height: 16),
+            Text(
+              'No watch history yet',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Start watching anime to see your history here',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
+        ),
       );
     }
 
@@ -83,14 +87,14 @@ class _HomeViewState extends State<HomeView> {
             ),
             delegate: SliverChildBuilderDelegate(
               (context, index) => AnimeGridTile(
-                anime: homeViewModel.trendingAnime[index],
+                anime: viewModel.watchedAnime[index],
                 onTap: (anime) => _navigateToDetail(context, anime),
               ),
-              childCount: homeViewModel.trendingAnime.length,
+              childCount: viewModel.watchedAnime.length,
             ),
           ),
         ),
-        if (homeViewModel.isLoading && homeViewModel.trendingAnime.isNotEmpty)
+        if (viewModel.isLoadingHistory && viewModel.watchedAnime.isNotEmpty)
           const SliverToBoxAdapter(
             child: Center(
               child: Padding(padding: EdgeInsets.only(bottom: 38), child: CircularProgressIndicator()),
