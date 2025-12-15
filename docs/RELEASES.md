@@ -4,13 +4,13 @@ Download ready-to-run binaries from the **[Releases](https://github.com/brokiem/
 
 ## Available Builds
 
-| File | Platform | Description |
-|:-----|:---------|:------------|
-| `app-arm64-v8a-release.apk` | Android | 64-bit (arm64) — Modern phones/tablets |
-| `app-armeabi-v7a-release.apk` | Android | 32-bit (armv7) — Older devices |
-| `app-x86_64-release.apk` | Android | x86-64 — Emulators |
-| `aimi-windows.zip` | Windows | Unzip and run `aimi_app.exe` |
-| `aimi-linux.zip` | Linux | Unzip and run `./aimi_app` |
+| File                          | Platform | Description                            |
+|:------------------------------|:---------|:---------------------------------------|
+| `app-arm64-v8a-release.apk`   | Android  | 64-bit (arm64) — Modern phones/tablets |
+| `app-armeabi-v7a-release.apk` | Android  | 32-bit (armv7) — Older devices         |
+| `app-x86_64-release.apk`      | Android  | x86-64 — Emulators                     |
+| `aimi-windows.zip`            | Windows  | Unzip and run `aimi_app.exe`           |
+| `aimi-linux.zip`              | Linux    | Unzip and run `./aimi_app`             |
 
 ## Installation Tips
 

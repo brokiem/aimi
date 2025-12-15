@@ -19,22 +19,32 @@ A modern, cross-platform anime streaming app built with Flutter.
 
 Get the latest release: **[Releases Page](https://github.com/brokiem/aimi/releases)**
 
+### Available Builds
+
+| File                          | Platform | Description                            |
+|:------------------------------|:---------|:---------------------------------------|
+| `app-arm64-v8a-release.apk`   | Android  | 64-bit (arm64) — Modern phones/tablets |
+| `app-armeabi-v7a-release.apk` | Android  | 32-bit (armv7) — Older devices         |
+| `app-x86_64-release.apk`      | Android  | x86-64 — Emulators                     |
+| `aimi-windows.zip`            | Windows  | Unzip and run `aimi_app.exe`           |
+| `aimi-linux.zip`              | Linux    | Unzip and run `./aimi_app`             |
+
 > For installation instructions and platform-specific tips, see [docs/RELEASES.md](docs/RELEASES.md)
 
 ## 🏗️ Architecture
 
-| Package | Description |
-|:--------|:------------|
+| Package                         | Description                                               |
+|:--------------------------------|:----------------------------------------------------------|
 | [`aimi_app`](packages/aimi_app) | Flutter app — UI, state management, platform integrations |
-| [`aimi_lib`](packages/aimi_lib) | Core Dart library — providers, models, business logic |
+| [`aimi_lib`](packages/aimi_lib) | Core Dart library — providers, models, business logic     |
 
 ## 🔌 Providers
 
-| Type | Provider | Status |
-|:-----|:---------|:-------|
-| Metadata | AniList | ✅ Active |
+| Type      | Provider  | Status   |
+|:----------|:----------|:---------|
+| Metadata  | AniList   | ✅ Active |
 | Streaming | AnimePahe | ✅ Active |
-| Streaming | Anizone | ✅ Active |
+| Streaming | Anizone   | ✅ Active |
 
 ## 🚀 Development
 
