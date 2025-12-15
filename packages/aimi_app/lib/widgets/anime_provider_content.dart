@@ -499,7 +499,7 @@ class EpisodeCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     final isWatched = watchEntry?.isCompleted ?? false;
-    final hasProgress = watchEntry != null && !isWatched && watchEntry!.progress > 0.05;
+    final hasProgress = watchEntry != null && !isWatched && watchEntry!.progress > 0;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
@@ -581,7 +581,7 @@ class EpisodeThumbnail extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final thumbnailService = context.read<ThumbnailService>();
-    final hasProgress = progress != null && !isWatched && progress! > 0.05;
+    final hasProgress = progress != null && !isWatched && progress! > 0;
 
     return StreamBuilder<String>(
       stream: thumbnailService.onThumbnailUpdated,
