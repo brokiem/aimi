@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:aimi_app/models/anime.dart';
 import 'package:aimi_app/models/watch_history_entry.dart';
 import 'package:aimi_app/services/anime_service.dart';
@@ -8,7 +10,15 @@ class HistoryViewModel extends ChangeNotifier {
   final WatchHistoryService _watchHistoryService;
   final AnimeService _animeService;
 
-  HistoryViewModel(this._watchHistoryService, this._animeService);
+  StreamSubscription<WatchHistoryEntry>? _historyUpdateSubscription;
+
+  HistoryViewModel(this._watchHistoryService, this._animeService) {
+    // Listen to watch history updates
+    _historyUpdateSubscription = _watchHistoryService.onProgressUpdated.listen((_) {
+      // Refresh history when updates occur
+      fetchWatchHistory();
+    });
+  }
 
   final List<WatchHistoryEntry> _watchHistory = [];
   final List<Anime> _watchedAnime = [];
@@ -64,5 +74,11 @@ class HistoryViewModel extends ChangeNotifier {
       _isLoadingHistory = false;
       notifyListeners();
     }
+  }
+
+  @override
+  void dispose() {
+    _historyUpdateSubscription?.cancel();
+    super.dispose();
   }
 }
