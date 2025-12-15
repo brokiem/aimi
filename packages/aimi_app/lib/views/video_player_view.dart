@@ -10,7 +10,7 @@ import '../services/preferences_service.dart';
 import '../services/thumbnail_service.dart';
 import '../services/watch_history_service.dart';
 import '../viewmodels/detail_viewmodel.dart';
-import '../viewmodels/video_player_view_model.dart';
+import '../viewmodels/video_player_viewmodel.dart';
 import '../widgets/anime_provider_content.dart';
 import '../widgets/video_player/video_player_controls.dart';
 import '../widgets/video_player/video_settings_sheet.dart';
