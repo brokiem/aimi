@@ -14,7 +14,7 @@ class HistoryViewModel extends ChangeNotifier {
 
   HistoryViewModel(this._watchHistoryService, this._animeService) {
     // Listen to watch history updates
-    _historyUpdateSubscription = _watchHistoryService.onProgressUpdated.listen((_) {
+    _historyUpdateSubscription = _watchHistoryService.onProgressUpdated.listen((entry) {
       // Refresh history when updates occur
       fetchWatchHistory();
     });

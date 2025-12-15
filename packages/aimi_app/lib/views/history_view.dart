@@ -20,12 +20,11 @@ class _HistoryViewState extends State<HistoryView> {
   @override
   void initState() {
     super.initState();
+    // Always fetch fresh history when view appears
+    // This ensures newly watched anime show up immediately
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final viewModel = Provider.of<HistoryViewModel>(context, listen: false);
-      // Logic from HomeView: fetch history if empty
-      if (viewModel.watchHistory.isEmpty) {
-        viewModel.fetchWatchHistory();
-      }
+      viewModel.fetchWatchHistory();
     });
   }
 
