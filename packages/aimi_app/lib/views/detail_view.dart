@@ -281,6 +281,7 @@ class _DetailViewState extends State<DetailView> with TickerProviderStateMixin {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'watch_now_fab',
         onPressed: () => _openWatchSheet(context),
         icon: const Icon(Icons.play_arrow_rounded),
         label: const Text('Watch Now'),
@@ -304,10 +305,7 @@ class _DetailViewState extends State<DetailView> with TickerProviderStateMixin {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Cover Image
-                    Hero(
-                      tag: 'anime-cover-${anime.id}',
-                      child: AnimeCover(pictureUrl: anime.coverImage.large, width: 115, height: 170),
-                    ),
+                    AnimeCover(pictureUrl: anime.coverImage.large, width: 115, height: 170),
                     const SizedBox(width: 16),
                     // Title and Summary Info
                     Expanded(
@@ -473,6 +471,7 @@ class _DetailViewState extends State<DetailView> with TickerProviderStateMixin {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'watch_now_fab',
         onPressed: () {
           // Trigger search if not initialized or if needed
           final vm = context.read<DetailViewModel>();
@@ -542,10 +541,7 @@ class _DetailViewState extends State<DetailView> with TickerProviderStateMixin {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Left Column: Cover + Buttons
-            Hero(
-              tag: 'anime-cover-${anime.id}',
-              child: AnimeCover(pictureUrl: anime.coverImage.large),
-            ),
+            AnimeCover(pictureUrl: anime.coverImage.large),
             const SizedBox(width: 28),
             // Right Column: Title + Description
             Expanded(

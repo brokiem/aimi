@@ -58,6 +58,7 @@ class _MainViewState extends State<MainView> {
               destinations: barDestinations,
             ),
             floatingActionButton: FloatingActionButton(
+              heroTag: 'search_fab',
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SearchView())),
               child: const Icon(Icons.search),
             ),
@@ -71,6 +72,7 @@ class _MainViewState extends State<MainView> {
                 onDestinationSelected: _onDestinationSelected,
                 labelType: NavigationRailLabelType.all,
                 leading: FloatingActionButton(
+                  heroTag: 'search_rail_fab',
                   elevation: 0,
                   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SearchView())),
                   child: const Icon(Icons.search),

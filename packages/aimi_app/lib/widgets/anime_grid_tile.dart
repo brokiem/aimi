@@ -54,91 +54,84 @@ class _AnimeGridTileState extends State<AnimeGridTile> {
           children: [
             AspectRatio(
               aspectRatio: 202 / 285,
-              child: Hero(
-                tag: 'anime-cover-${widget.anime.id}',
-                child: Material(
-                  borderRadius: BorderRadius.circular(8),
-                  clipBehavior: Clip.antiAlias,
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  child: Stack(
-                    children: [
-                      Ink.image(
-                        image: CachedNetworkImageProvider(widget.anime.coverImage.large),
-                        fit: BoxFit.cover,
-                        child: InkWell(onTap: onTap),
-                      ),
-                      // Score badge (top-left)
-                      if (anime.averageScore != null)
-                        Positioned(
-                          top: 8,
-                          left: 8,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: _getScoreColor(anime.averageScore!),
-                              borderRadius: BorderRadius.circular(6),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.3),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.star_rounded, color: Colors.white, size: 14),
-                                const SizedBox(width: 2),
-                                Text(
-                                  '${anime.averageScore}%',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
+              child: Material(
+                borderRadius: BorderRadius.circular(8),
+                clipBehavior: Clip.antiAlias,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                child: Stack(
+                  children: [
+                    Ink.image(
+                      image: CachedNetworkImageProvider(widget.anime.coverImage.large),
+                      fit: BoxFit.cover,
+                      child: InkWell(onTap: onTap),
+                    ),
+                    // Score badge (top-left)
+                    if (anime.averageScore != null)
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: _getScoreColor(anime.averageScore!),
+                            borderRadius: BorderRadius.circular(6),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.3),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.star_rounded, color: Colors.white, size: 14),
+                              const SizedBox(width: 2),
+                              Text(
+                                '${anime.averageScore}%',
+                                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                            ],
                           ),
                         ),
-                      // Bottom gradient overlay with info
-                      if (infoItems.isNotEmpty)
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [Colors.transparent, Colors.black.withValues(alpha: 0.7)],
-                              ),
-                            ),
-                            padding: const EdgeInsets.fromLTRB(8, 24, 8, 8),
-                            child: Text(
-                              infoItems.join(' • '),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                shadows: [Shadow(color: Colors.black54, blurRadius: 2)],
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                      ),
+                    // Bottom gradient overlay with info
+                    if (infoItems.isNotEmpty)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Colors.transparent, Colors.black.withValues(alpha: 0.7)],
                             ),
                           ),
-                        ),
-                      // Hover overlay
-                      Positioned.fill(
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 100),
-                          color: _isHovered ? Colors.black.withValues(alpha: 0.1) : Colors.transparent,
+                          padding: const EdgeInsets.fromLTRB(8, 24, 8, 8),
+                          child: Text(
+                            infoItems.join(' • '),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              shadows: [Shadow(color: Colors.black54, blurRadius: 2)],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ),
-                    ],
-                  ),
+                    // Hover overlay
+                    Positioned.fill(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 100),
+                        color: _isHovered ? Colors.black.withValues(alpha: 0.1) : Colors.transparent,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
