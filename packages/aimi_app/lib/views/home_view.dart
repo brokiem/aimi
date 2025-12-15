@@ -2,6 +2,7 @@ import 'package:aimi_app/models/anime.dart';
 import 'package:aimi_app/viewmodels/home_viewmodel.dart';
 import 'package:aimi_app/views/detail_view.dart';
 import 'package:aimi_app/views/search_view.dart';
+import 'package:aimi_app/views/settings_view.dart';
 import 'package:aimi_app/widgets/anime_grid_tile.dart';
 import 'package:aimi_app/widgets/common/error_view.dart';
 import 'package:flutter/material.dart';
@@ -296,27 +297,6 @@ class _HomeViewState extends State<HomeView> {
   }
 
   Widget _buildSettingsPage() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.settings, size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
-          const SizedBox(height: 16),
-          Text(
-            'Settings',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Coming soon',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-            ),
-          ),
-        ],
-      ),
-    );
+    return const SettingsView();
   }
 }

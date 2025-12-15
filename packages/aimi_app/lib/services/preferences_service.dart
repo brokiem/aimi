@@ -11,6 +11,12 @@ enum PrefKey {
 
   /// Video player volume (0-100)
   videoVolume,
+
+  /// Theme mode (system, light, dark)
+  themeMode,
+
+  /// Seed color for dynamic theme (int value of color)
+  seedColor,
 }
 
 /// Service for managing user preferences.
