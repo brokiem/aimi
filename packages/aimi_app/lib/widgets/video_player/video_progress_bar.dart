@@ -34,30 +34,58 @@ class VideoProgressBar extends StatefulWidget {
 }
 
 class _VideoProgressBarState extends State<VideoProgressBar> {
-  bool _isHovering = false;
-  double? _hoverValue; // 0.0 to 1.0
-  bool _isDragging = false;
+  // Use ValueNotifiers to avoid rebuilding entire widget tree
+  final ValueNotifier<bool> _isHovering = ValueNotifier(false);
+  final ValueNotifier<double?> _hoverValue = ValueNotifier(null);
+  final ValueNotifier<bool> _isDragging = ValueNotifier(false);
+  final ValueNotifier<Duration?> _dragDuration = ValueNotifier(null);
+
   OverlayEntry? _tooltipOverlay;
-  Duration? _dragDuration;
+  final ValueNotifier<Offset> _tooltipPosition = ValueNotifier(Offset.zero);
+  final ValueNotifier<Duration> _tooltipDuration = ValueNotifier(Duration.zero);
+
+  // Cache render box to avoid repeated lookups
+  RenderBox? _cachedRenderBox;
 
   @override
   void dispose() {
     _removeTooltip();
+    _isHovering.dispose();
+    _hoverValue.dispose();
+    _isDragging.dispose();
+    _dragDuration.dispose();
+    _tooltipPosition.dispose();
+    _tooltipDuration.dispose();
     super.dispose();
   }
 
-  void _showTooltip(BuildContext context, Offset position, Duration time) {
-    _removeTooltip();
+  RenderBox? _getRenderBox(BuildContext context) {
+    _cachedRenderBox ??= context.findRenderObject() as RenderBox?;
+    return _cachedRenderBox;
+  }
+
+  void _showOrUpdateTooltip(BuildContext context, Offset position, Duration time) {
+    _tooltipPosition.value = position;
+    _tooltipDuration.value = time;
+
+    if (_tooltipOverlay != null) return; // Already showing, just update notifiers
+
     _tooltipOverlay = OverlayEntry(
-      builder: (context) => Positioned(
-        left: position.dx.clamp(0, MediaQuery.of(context).size.width - 50),
-        top: position.dy - 40,
-        child: Material(
-          elevation: 4.0,
-          borderRadius: BorderRadius.circular(4),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-            child: Text(formatDuration(time), style: Theme.of(context).textTheme.bodySmall),
+      builder: (overlayContext) => ValueListenableBuilder<Offset>(
+        valueListenable: _tooltipPosition,
+        builder: (_, pos, __) => ValueListenableBuilder<Duration>(
+          valueListenable: _tooltipDuration,
+          builder: (_, dur, __) => Positioned(
+            left: pos.dx.clamp(0, MediaQuery.of(overlayContext).size.width - 50),
+            top: pos.dy - 45,
+            child: Material(
+              elevation: 4.0,
+              borderRadius: BorderRadius.circular(4),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                child: Text(formatDuration(dur), style: Theme.of(overlayContext).textTheme.bodySmall),
+              ),
+            ),
           ),
         ),
       ),
@@ -67,6 +95,7 @@ class _VideoProgressBarState extends State<VideoProgressBar> {
 
   void _removeTooltip() {
     _tooltipOverlay?.remove();
+    _tooltipOverlay?.dispose();
     _tooltipOverlay = null;
   }
 
@@ -82,64 +111,68 @@ class _VideoProgressBarState extends State<VideoProgressBar> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        // Reset cached render box when layout changes
+        _cachedRenderBox = null;
+
         return MouseRegion(
-          onEnter: (_) => setState(() => _isHovering = true),
+          onEnter: (_) => _isHovering.value = true,
           onExit: (_) {
-            setState(() {
-              _isHovering = false;
-              _hoverValue = null;
-            });
+            _isHovering.value = false;
+            _hoverValue.value = null;
             _removeTooltip();
           },
           onHover: (event) {
-            final box = context.findRenderObject() as RenderBox;
+            final box = _getRenderBox(context);
+            if (box == null) return;
+
             final localPos = box.globalToLocal(event.position);
             final value = (localPos.dx / constraints.maxWidth).clamp(0.0, 1.0);
-            setState(() => _hoverValue = value);
+            _hoverValue.value = value;
 
             final hoverDuration = Duration(milliseconds: (value * widget.duration.inMilliseconds).toInt());
             final hoverPosition = Offset(localPos.dx, box.size.height / 2);
             final globalPos = box.localToGlobal(hoverPosition);
-            _showTooltip(context, globalPos, hoverDuration);
+            _showOrUpdateTooltip(context, globalPos, hoverDuration);
           },
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
             onHorizontalDragStart: (details) {
-              setState(() {
-                _isDragging = true;
-                _dragDuration = _durationFromDx(details.localPosition.dx, constraints.maxWidth);
-              });
-              widget.onDragStart?.call(widget.position);
-              widget.onDragUpdate?.call(_dragDuration!);
+              _isDragging.value = true;
+              final duration = _durationFromDx(details.localPosition.dx, constraints.maxWidth);
+              _dragDuration.value = duration;
+              _hoverValue.value = (details.localPosition.dx / constraints.maxWidth).clamp(0.0, 1.0);
 
-              // Show tooltip
-              final box = context.findRenderObject() as RenderBox;
-              final hoverPosition = Offset(details.localPosition.dx, box.size.height / 2);
-              final globalPos = box.localToGlobal(hoverPosition);
-              _showTooltip(context, globalPos, _dragDuration!);
+              widget.onDragStart?.call(widget.position);
+              widget.onDragUpdate?.call(duration);
+
+              final box = _getRenderBox(context);
+              if (box != null) {
+                final hoverPosition = Offset(details.localPosition.dx, box.size.height / 2);
+                final globalPos = box.localToGlobal(hoverPosition);
+                _showOrUpdateTooltip(context, globalPos, duration);
+              }
             },
             onHorizontalDragUpdate: (details) {
-              setState(() {
-                _dragDuration = _durationFromDx(details.localPosition.dx, constraints.maxWidth);
-                final value = (details.localPosition.dx / constraints.maxWidth).clamp(0.0, 1.0);
-                _hoverValue = value;
-              });
-              widget.onDragUpdate?.call(_dragDuration!);
+              final duration = _durationFromDx(details.localPosition.dx, constraints.maxWidth);
+              _dragDuration.value = duration;
+              _hoverValue.value = (details.localPosition.dx / constraints.maxWidth).clamp(0.0, 1.0);
 
-              // Update tooltip
-              final box = context.findRenderObject() as RenderBox;
-              final hoverPosition = Offset(details.localPosition.dx, box.size.height / 2);
-              final globalPos = box.localToGlobal(hoverPosition);
-              _showTooltip(context, globalPos, _dragDuration!);
+              widget.onDragUpdate?.call(duration);
+
+              final box = _getRenderBox(context);
+              if (box != null) {
+                final hoverPosition = Offset(details.localPosition.dx, box.size.height / 2);
+                final globalPos = box.localToGlobal(hoverPosition);
+                _showOrUpdateTooltip(context, globalPos, duration);
+              }
             },
             onHorizontalDragEnd: (details) {
-              if (_dragDuration != null) {
-                widget.onSeek(_dragDuration!);
+              final duration = _dragDuration.value;
+              if (duration != null) {
+                widget.onSeek(duration);
               }
-              setState(() {
-                _isDragging = false;
-                _dragDuration = null;
-              });
+              _isDragging.value = false;
+              _dragDuration.value = null;
               widget.onDragEnd?.call(widget.position);
               _removeTooltip();
             },
@@ -151,14 +184,16 @@ class _VideoProgressBarState extends State<VideoProgressBar> {
               height: 20, // Hit target height
               color: Colors.transparent,
               child: Center(
-                child: CustomPaint(
-                  size: Size(constraints.maxWidth, 4), // Visual bar height
-                  painter: _ProgressBarPainter(
-                    position: _dragDuration ?? widget.position,
+                child: RepaintBoundary(
+                  child: _ProgressBarWidget(
+                    width: constraints.maxWidth,
+                    position: widget.position,
                     duration: widget.duration,
                     buffer: widget.buffer,
-                    hoverValue: _hoverValue,
-                    isHovering: _isHovering || _isDragging,
+                    hoverValueNotifier: _hoverValue,
+                    isHoveringNotifier: _isHovering,
+                    isDraggingNotifier: _isDragging,
+                    dragDurationNotifier: _dragDuration,
                     bufferedColor: resolvedBufferedColor,
                     progressColor: resolvedProgressColor,
                     backgroundColor: resolvedBackgroundColor,
@@ -180,6 +215,60 @@ class _VideoProgressBarState extends State<VideoProgressBar> {
   }
 }
 
+/// Separate widget that listens to ValueNotifiers to minimize rebuilds
+class _ProgressBarWidget extends StatelessWidget {
+  final double width;
+  final Duration position;
+  final Duration duration;
+  final Duration buffer;
+  final ValueNotifier<double?> hoverValueNotifier;
+  final ValueNotifier<bool> isHoveringNotifier;
+  final ValueNotifier<bool> isDraggingNotifier;
+  final ValueNotifier<Duration?> dragDurationNotifier;
+  final Color bufferedColor;
+  final Color progressColor;
+  final Color backgroundColor;
+  final Color hoverColor;
+
+  const _ProgressBarWidget({
+    required this.width,
+    required this.position,
+    required this.duration,
+    required this.buffer,
+    required this.hoverValueNotifier,
+    required this.isHoveringNotifier,
+    required this.isDraggingNotifier,
+    required this.dragDurationNotifier,
+    required this.bufferedColor,
+    required this.progressColor,
+    required this.backgroundColor,
+    required this.hoverColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([hoverValueNotifier, isHoveringNotifier, isDraggingNotifier, dragDurationNotifier]),
+      builder: (context, _) {
+        return CustomPaint(
+          size: Size(width, 4), // Visual bar height
+          painter: _ProgressBarPainter(
+            position: dragDurationNotifier.value ?? position,
+            duration: duration,
+            buffer: buffer,
+            hoverValue: hoverValueNotifier.value,
+            isHovering: isHoveringNotifier.value || isDraggingNotifier.value,
+            bufferedColor: bufferedColor,
+            progressColor: progressColor,
+            backgroundColor: backgroundColor,
+            hoverColor: hoverColor,
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _ProgressBarPainter extends CustomPainter {
   final Duration position;
   final Duration duration;
@@ -191,6 +280,9 @@ class _ProgressBarPainter extends CustomPainter {
   final Color progressColor;
   final Color backgroundColor;
   final Color hoverColor;
+
+  // Cache paints for reuse
+  static final Map<Color, Paint> _paintCache = {};
 
   _ProgressBarPainter({
     required this.position,
@@ -204,6 +296,10 @@ class _ProgressBarPainter extends CustomPainter {
     required this.hoverColor,
   });
 
+  Paint _getPaint(Color color) {
+    return _paintCache.putIfAbsent(color, () => Paint()..color = color);
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     if (duration.inMilliseconds == 0) return;
@@ -212,46 +308,46 @@ class _ProgressBarPainter extends CustomPainter {
     final double positionValue = (position.inMilliseconds / totalMs).clamp(0.0, 1.0);
     final double bufferValue = (buffer.inMilliseconds / totalMs).clamp(0.0, 1.0);
 
-    final Paint bgPaint = Paint()..color = backgroundColor;
-    final Paint bufferPaint = Paint()..color = bufferedColor;
-    final Paint progressPaint = Paint()..color = progressColor;
-    final Paint hoverPaint = Paint()..color = hoverColor;
+    final bgPaint = _getPaint(backgroundColor);
+    final bufferPaint = _getPaint(bufferedColor);
+    final progressPaint = _getPaint(progressColor);
+    final hoverPaint = _getPaint(hoverColor);
 
-    final RRect fullRRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      Radius.circular(size.height / 2),
-    );
+    final radius = Radius.circular(size.height / 2);
+    final RRect fullRRect = RRect.fromRectAndRadius(Rect.fromLTWH(0, 0, size.width, size.height), radius);
 
     // 1. Draw Background
     canvas.drawRRect(fullRRect, bgPaint);
 
-    // Clip further drawing to the rounded rectangle to ensure corners are rounded.
+    // Save canvas state before clipping
+    canvas.save();
     canvas.clipRRect(fullRRect);
 
     // 2. Draw Buffer
     final double bufferWidth = size.width * bufferValue;
-    final Rect bufferRect = Rect.fromLTWH(0, 0, bufferWidth, size.height);
-    canvas.drawRect(bufferRect, bufferPaint);
+    canvas.drawRect(Rect.fromLTWH(0, 0, bufferWidth, size.height), bufferPaint);
 
     // 3. Draw Hover (Gray highlight)
-    if (isHovering && hoverValue != null) {
+    if (isHovering && hoverValue != null && hoverValue! > positionValue) {
       final double hoverWidth = size.width * hoverValue!;
-      if (hoverValue! > positionValue) {
-        final Rect hoverRect = Rect.fromLTWH(0, 0, hoverWidth, size.height);
-        canvas.drawRect(hoverRect, hoverPaint);
-      }
+      canvas.drawRect(Rect.fromLTWH(0, 0, hoverWidth, size.height), hoverPaint);
     }
 
     // 4. Draw Progress
     final double progressWidth = size.width * positionValue;
-    final Rect progressRect = Rect.fromLTWH(0, 0, progressWidth, size.height);
-    canvas.drawRect(progressRect, progressPaint);
+    canvas.drawRect(Rect.fromLTWH(0, 0, progressWidth, size.height), progressPaint);
 
-    // 5. Draw Thumb (Circle)
+    // Restore canvas state
+    canvas.restore();
+
+    // 5. Draw Thumb (Circle) at progress position - outside clip to ensure full circle is visible
+    final double thumbX = size.width * positionValue;
+    canvas.drawCircle(Offset(thumbX, size.height / 2), 6.0, progressPaint);
+
+    // 6. Draw Hover Thumb if hovering or dragging
     if (isHovering && hoverValue != null) {
-      final double thumbX = size.width * hoverValue!;
-      final double thumbRadius = 6.0;
-      canvas.drawCircle(Offset(thumbX, size.height / 2), thumbRadius, progressPaint);
+      final double hoverThumbX = size.width * hoverValue!;
+      canvas.drawCircle(Offset(hoverThumbX, size.height / 2), 6.0, hoverPaint);
     }
   }
 
@@ -261,6 +357,10 @@ class _ProgressBarPainter extends CustomPainter {
         duration != oldDelegate.duration ||
         buffer != oldDelegate.buffer ||
         hoverValue != oldDelegate.hoverValue ||
-        isHovering != oldDelegate.isHovering;
+        isHovering != oldDelegate.isHovering ||
+        bufferedColor != oldDelegate.bufferedColor ||
+        progressColor != oldDelegate.progressColor ||
+        backgroundColor != oldDelegate.backgroundColor ||
+        hoverColor != oldDelegate.hoverColor;
   }
 }
