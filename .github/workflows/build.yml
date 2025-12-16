@@ -40,6 +40,16 @@ jobs:
           channel: 'stable'
       - name: Install dependencies
         run: flutter pub get
+      - name: Decode Keystore
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > packages/aimi_app/android/key.jks
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      - name: Set Environment Variables
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
       - name: Build APK
         run: |
           cd packages/aimi_app
@@ -93,4 +103,3 @@ jobs:
         with:
           name: aimi-linux
           path: packages/aimi_app/build/linux/x64/release/bundle/
-
