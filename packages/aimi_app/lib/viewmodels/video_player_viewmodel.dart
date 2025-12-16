@@ -62,7 +62,6 @@ class VideoPlayerViewModel extends ChangeNotifier {
   Duration _currentDuration = Duration.zero;
   static const _saveInterval = Duration(seconds: 10);
   DateTime? _lastSaveTime;
-  bool _isSeeking = false;
 
   // Stall detection
   Timer? _stallDetectionTimer;
@@ -140,7 +139,7 @@ class VideoPlayerViewModel extends ChangeNotifier {
   }
 
   void _onPositionChanged(Duration position) {
-    if (_isDisposed || _isSeeking) return;
+    if (_isDisposed) return;
 
     final now = DateTime.now();
     final timeSinceLastSave = _lastSaveTime != null ? now.difference(_lastSaveTime!) : _saveInterval;
@@ -170,46 +169,32 @@ class VideoPlayerViewModel extends ChangeNotifier {
     final matchDurationMs = result.matchDurationMs;
 
     if (targetPosition != Duration.zero && !_isDisposed) {
-      _isSeeking = true;
-      try {
-        // Wait for duration to be available for validation (up to 2 seconds)
-        Duration duration = _currentDuration;
-        if (duration == Duration.zero) {
-          try {
-            duration = await player.stream.duration
-                .firstWhere((d) => d != Duration.zero)
-                .timeout(const Duration(seconds: 2));
-          } catch (_) {
-            debugPrint('Timeout waiting for duration metadata');
+      // Wait for the player to be ready with duration
+      StreamSubscription<Duration>? sub;
+      sub = player.stream.duration.listen((duration) {
+        if (duration != Duration.zero) {
+          bool shouldSeek = true;
+
+          // If it's a cross-provider match, verify duration similarity
+          if (isCrossProvider && matchDurationMs != null) {
+            final difference = (duration.inMilliseconds - matchDurationMs).abs();
+            // Allow 60 seconds difference (60,000 ms)
+            if (difference > 60000) {
+              shouldSeek = false;
+              debugPrint('Cross-provider sync skipped: Duration mismatch ($difference ms)');
+            }
           }
-        }
 
-        // Cross-provider validation
-        if (duration != Duration.zero && isCrossProvider && matchDurationMs != null) {
-          final difference = (duration.inMilliseconds - matchDurationMs).abs();
-          if (difference > 60000) {
-            debugPrint('Cross-provider sync skipped: Duration mismatch ($difference ms)');
-            return;
+          if (shouldSeek) {
+            // Don't seek if we're near the end (> 98% watched)
+            if (targetPosition < duration * 0.98) {
+              player.seek(targetPosition);
+              debugPrint('Resumed playback at ${targetPosition.inSeconds}s${isCrossProvider ? ' (synced)' : ''}');
+            }
           }
+          sub?.cancel();
         }
-
-        // Don't resume if almost finished
-        if (duration != Duration.zero && targetPosition > duration * 0.98) {
-          debugPrint('Resume skipped: Video > 98% completed');
-          return;
-        }
-
-        // Use the buffering-aware seek to prevent race conditions on initial load
-        await _waitForBufferingAndSeek(targetPosition, true);
-
-        // Additional safety delay to let the player settle
-        await Future.delayed(const Duration(milliseconds: 500));
-        debugPrint('Resumed playback at ${targetPosition.inSeconds}s${isCrossProvider ? ' (synced)' : ''}');
-      } finally {
-        if (!_isDisposed) {
-          _isSeeking = false;
-        }
-      }
+      });
     }
   }
 
