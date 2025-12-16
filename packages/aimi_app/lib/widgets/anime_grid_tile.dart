@@ -1,4 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart'; // Added this import for CachedNetworkImageProvider
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -49,24 +49,23 @@ class _AnimeGridTileState extends State<AnimeGridTile> {
       infoItems.add('${_formatSeason(anime.season!)} ${anime.seasonYear}');
     }
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AspectRatio(
-              aspectRatio: 202 / 285,
-              child: Material(
-                borderRadius: BorderRadius.circular(8),
-                clipBehavior: Clip.antiAlias,
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+    return RepaintBoundary(
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AspectRatio(
+                aspectRatio: 202 / 285,
                 child: Stack(
                   children: [
+                    // Cover Image
                     _buildCoverImage(context),
+
                     // Score badge (top-left)
                     if (anime.averageScore != null)
                       Positioned(
@@ -77,13 +76,6 @@ class _AnimeGridTileState extends State<AnimeGridTile> {
                           decoration: BoxDecoration(
                             color: _getScoreColor(anime.averageScore!),
                             borderRadius: BorderRadius.circular(6),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.3),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -98,6 +90,7 @@ class _AnimeGridTileState extends State<AnimeGridTile> {
                           ),
                         ),
                       ),
+
                     // Bottom gradient overlay with info
                     if (infoItems.isNotEmpty)
                       Positioned(
@@ -106,6 +99,7 @@ class _AnimeGridTileState extends State<AnimeGridTile> {
                         bottom: 0,
                         child: Container(
                           decoration: BoxDecoration(
+                            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
@@ -115,44 +109,51 @@ class _AnimeGridTileState extends State<AnimeGridTile> {
                           padding: const EdgeInsets.fromLTRB(8, 24, 8, 8),
                           child: Text(
                             infoItems.join(' • '),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              shadows: [Shadow(color: Colors.black54, blurRadius: 2)],
-                            ),
+                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w500),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ),
+
                     // Hover overlay
                     Positioned.fill(
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 100),
-                        color: _isHovered ? Colors.black.withValues(alpha: 0.1) : Colors.transparent,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          color: _isHovered ? Colors.black.withValues(alpha: 0.1) : Colors.transparent,
+                        ),
+                      ),
+                    ),
+
+                    // Ripple
+                    Positioned.fill(
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(8)),
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Consumer<SettingsService>(
-              builder: (context, settingsService, child) {
-                final preferredTitle = getPreferredTitle(widget.anime.title, settingsService.titleLanguagePreference);
-                return Text(
-                  preferredTitle,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w500,
-                    color: _isHovered ? Theme.of(context).colorScheme.primary : null,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                );
-              },
-            ),
-          ],
+              const SizedBox(height: 8),
+              Consumer<SettingsService>(
+                builder: (context, settingsService, child) {
+                  final preferredTitle = getPreferredTitle(widget.anime.title, settingsService.titleLanguagePreference);
+                  return Text(
+                    preferredTitle,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: _isHovered ? Theme.of(context).colorScheme.primary : null,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -160,22 +161,39 @@ class _AnimeGridTileState extends State<AnimeGridTile> {
 
   /// Builds the cover image with optional Hero animation based on settings.
   Widget _buildCoverImage(BuildContext context) {
-    final settingsService = context.watch<SettingsService>();
-    final coverImage = Ink.image(
-      image: CachedNetworkImageProvider(widget.anime.coverImage.large),
+    final settingsService = context.read<SettingsService>();
+
+    final imageWidget = CachedNetworkImage(
+      imageUrl: widget.anime.coverImage.large,
       fit: BoxFit.cover,
-      child: InkWell(onTap: () => widget.onTap(widget.anime)),
+      width: double.infinity,
+      height: double.infinity,
+      placeholder: (context, url) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+      errorWidget: (context, url, error) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Icon(Icons.error),
+      ),
+      imageBuilder: (context, imageProvider) => Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
+        ),
+      ),
     );
 
     if (settingsService.enableHeroAnimation && widget.heroTagPrefix != null) {
       final tagPrefix = widget.heroTagPrefix;
-      return Hero(
-        tag: 'anime_cover_${tagPrefix}_${widget.anime.id}',
-        // Material is required during Hero flight as Ink needs a Material ancestor
-        child: Material(type: MaterialType.transparency, child: coverImage),
-      );
+      return Hero(tag: 'anime_cover_${tagPrefix}_${widget.anime.id}', child: imageWidget);
     }
-    return coverImage;
+    return imageWidget;
   }
 
   /// Returns a color based on the score (similar to Rotten Tomatoes)

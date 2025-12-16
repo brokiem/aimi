@@ -89,16 +89,19 @@ class _CharacterCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: CachedNetworkImage(
-                      imageUrl: character.image ?? '',
-                      width: double.infinity,
-                      height: imageHeight,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(color: Colors.grey[800]),
-                      errorWidget: (context, url, error) =>
-                          Container(color: Colors.grey[800], child: const Icon(Icons.error)),
+                  CachedNetworkImage(
+                    imageUrl: character.image ?? '',
+                    width: double.infinity,
+                    height: imageHeight,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(color: Colors.grey[800]),
+                    errorWidget: (context, url, error) =>
+                        Container(color: Colors.grey[800], child: const Icon(Icons.error)),
+                    imageBuilder: (context, imageProvider) => Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(6),
+                        image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -112,13 +115,16 @@ class _CharacterCard extends StatelessWidget {
                   if (voiceActor != null)
                     Row(
                       children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: CachedNetworkImage(
-                            imageUrl: voiceActor!.image,
-                            width: 20,
-                            height: 20,
-                            fit: BoxFit.cover,
+                        CachedNetworkImage(
+                          imageUrl: voiceActor!.image,
+                          width: 20,
+                          height: 20,
+                          fit: BoxFit.cover,
+                          imageBuilder: (context, imageProvider) => Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(4),
+                              image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),

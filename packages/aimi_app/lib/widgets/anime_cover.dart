@@ -13,23 +13,15 @@ class AnimeCover extends StatelessWidget {
     return SizedBox(
       width: width,
       height: height,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withAlpha((255 * 0.3).round()), blurRadius: 8, offset: const Offset(0, 4)),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: CachedNetworkImage(
-            imageUrl: pictureUrl,
-            height: height,
-            width: width,
-            fit: BoxFit.cover,
-            placeholder: (context, url) => Container(color: Colors.grey[800]),
-            errorWidget: (context, url, error) => Container(color: Colors.grey[800], child: const Icon(Icons.error)),
-          ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: CachedNetworkImage(
+          imageUrl: pictureUrl,
+          height: height,
+          width: width,
+          fit: BoxFit.cover,
+          placeholder: (context, url) => Container(color: Colors.grey[800]),
+          errorWidget: (context, url, error) => Container(color: Colors.grey[800], child: const Icon(Icons.error)),
         ),
       ),
     );

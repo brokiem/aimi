@@ -630,13 +630,31 @@ class EpisodeThumbnail extends StatelessWidget {
                       bottom: 0,
                       left: 0,
                       right: 0,
-                      child: ClipRRect(
-                        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.8),
-                          valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
-                          minHeight: 4,
+                      child: SizedBox(
+                        height: 4,
+                        child: Stack(
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.8),
+                                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
+                              ),
+                            ),
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                return Container(
+                                  width: constraints.maxWidth * progress!,
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primary,
+                                    borderRadius: BorderRadius.only(
+                                      bottomLeft: const Radius.circular(8),
+                                      bottomRight: progress! >= 0.98 ? const Radius.circular(8) : Radius.zero,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                         ),
                       ),
                     ),
