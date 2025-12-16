@@ -195,7 +195,7 @@ class VideoPlayerViewModel extends ChangeNotifier {
   Future<void> _waitForBufferAndSeek(Duration position, bool wasPlaying) async {
     try {
       // Wait for buffering to complete
-      await player.stream.buffering.where((b) => !b).first;
+      await player.stream.duration.where((duration) => duration > Duration.zero).first;
     } catch (_) {}
 
     if (!_isDisposed) {
