@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:rxdart/rxdart.dart';
 
 import '../models/streaming_source.dart';
 import '../models/video_feedback.dart';
@@ -11,7 +12,12 @@ import '../services/preferences_service.dart';
 import '../services/thumbnail_service.dart';
 import '../services/watch_history_service.dart';
 
+/// ViewModel for video playback with watch history, quality switching,
+/// and track selection support.
 class VideoPlayerViewModel extends ChangeNotifier {
+  late final Player player;
+  late final VideoController controller;
+
   List<StreamingSource> _sources;
 
   List<StreamingSource> get sources => _sources;
@@ -21,12 +27,8 @@ class VideoPlayerViewModel extends ChangeNotifier {
   String get episodeTitle => _episodeTitle;
 
   final String animeTitle;
-
-  // Watch history tracking
-  final WatchHistoryService? _watchHistoryService;
-  final PreferencesService? _preferencesService;
-  final ThumbnailService? _thumbnailService;
   final int? animeId;
+  final String? metadataProviderName;
 
   String? _episodeId;
 
@@ -40,35 +42,38 @@ class VideoPlayerViewModel extends ChangeNotifier {
 
   String? get streamProviderName => _streamProviderName;
 
-  final String? metadataProviderName;
-
-  late final Player player;
-  late final VideoController controller;
-
   int _currentSourceIndex = 0;
-  bool _isDisposed = false;
 
-  // Feedback stream
+  StreamingSource get currentSource => sources[_currentSourceIndex];
+
+  List<SubtitleTrack> _externalSubtitles = [];
+
+  List<SubtitleTrack> get externalSubtitles => _externalSubtitles;
+
+  final WatchHistoryService? _watchHistoryService;
+  final PreferencesService? _preferencesService;
+  final ThumbnailService? _thumbnailService;
+
   final _feedbackController = StreamController<VideoFeedbackEvent>.broadcast();
 
   Stream<VideoFeedbackEvent> get feedbackStream => _feedbackController.stream;
 
-  // Progress tracking
-  StreamSubscription<Duration>? _positionSubscription;
-  StreamSubscription<Duration>? _durationSubscription;
-  StreamSubscription<double>? _volumeSubscription;
-  Timer? _volumeSaveDebounce;
+  Duration _lastPosition = Duration.zero;
+  final _stallSubject = BehaviorSubject<bool>.seeded(false);
+
+  Stream<bool> get stallStream => _stallSubject.stream;
+
+  bool get isStalled => _stallSubject.value;
+
+  bool _isDisposed = false;
+  bool _isSavingThumbnail = false;
+  bool _pendingDispose = false;
+
   Duration _lastSavedPosition = Duration.zero;
-  Duration _currentDuration = Duration.zero;
-  static const _saveInterval = Duration(seconds: 10);
   DateTime? _lastSaveTime;
+  static const _saveInterval = Duration(seconds: 5);
 
-  // Stall detection
-  Timer? _stallDetectionTimer;
-  bool _isStalled = false;
-  Duration _lastStallCheckPosition = Duration.zero;
-
-  bool get isStalled => _isStalled;
+  CompositeSubscription? _subscriptions;
 
   VideoPlayerViewModel({
     required List<StreamingSource> sources,
@@ -96,60 +101,211 @@ class VideoPlayerViewModel extends ChangeNotifier {
   Future<void> _initialize() async {
     player = Player(
       configuration: PlayerConfiguration(
-        title: _getTitle(),
-        ready: () {
-          debugPrint('Player initialization complete');
-        },
+        title: animeTitle.isNotEmpty && episodeTitle.isNotEmpty
+            ? '$animeTitle - $episodeTitle'
+            : episodeTitle.isNotEmpty
+            ? episodeTitle
+            : 'Video Player',
       ),
     );
-
     controller = VideoController(player);
+    _subscriptions = CompositeSubscription();
 
-    // Track duration changes
-    _durationSubscription = player.stream.duration.listen((duration) {
-      _currentDuration = duration;
-    });
+    // Progress saving subscription
+    _subscriptions!.add(player.stream.position.listen(_onPositionChanged));
 
-    // Track position for saving progress
-    _positionSubscription = player.stream.position.listen(_onPositionChanged);
+    // Stall detection: check if position hasn't changed while playing & not buffering
+    _subscriptions!.add(
+      Rx.combineLatest3<bool, bool, Duration, bool>(
+        player.stream.playing,
+        player.stream.buffering,
+        player.stream.position.throttleTime(const Duration(seconds: 1)),
+        (playing, buffering, position) {
+          final stalled = playing && !buffering && position == _lastPosition && position != Duration.zero;
+          _lastPosition = position;
+          return stalled;
+        },
+      ).distinct().listen((stalled) {
+        if (_stallSubject.value != stalled) {
+          _stallSubject.add(stalled);
+          notifyListeners();
+        }
+      }),
+    );
 
+    // Load source, position, and volume
     if (sources.isNotEmpty) {
       _currentSourceIndex = _getBestQualityIndex();
       await _loadSource(sources[_currentSourceIndex]);
-
-      // Load saved position after source is loaded
       await _loadSavedPosition();
     }
-
-    // Restore volume
     await _loadSavedVolume();
+  }
 
-    // Start stall detection
-    _startStallDetection();
+  int _getBestQualityIndex() {
+    int bestIndex = 0, bestQuality = 0;
+    for (int i = 0; i < sources.length; i++) {
+      final quality = int.tryParse(sources[i].quality.replaceAll(RegExp(r'[^\d]'), '')) ?? 0;
+      if (quality > bestQuality) {
+        bestQuality = quality;
+        bestIndex = i;
+      }
+    }
+    return bestIndex;
+  }
 
-    // Listen to volume changes
-    _volumeSubscription = player.stream.volume.listen((volume) {
-      if (_isDisposed) return;
+  Future<void> _loadSource(StreamingSource source) async {
+    if (_isDisposed) return;
 
-      _volumeSaveDebounce?.cancel();
-      _volumeSaveDebounce = Timer(const Duration(seconds: 1), () {
-        _saveVolume(volume);
-      });
-    });
+    await player.setVideoTrack(VideoTrack.auto());
+    await player.setAudioTrack(AudioTrack.auto());
+    await player.setSubtitleTrack(SubtitleTrack.no());
+
+    _externalSubtitles = source.subtitles
+        .map((s) => SubtitleTrack.uri(s.url, title: s.label, language: s.language))
+        .toList();
+
+    await player.open(Media(source.url));
+
+    if (_externalSubtitles.isNotEmpty) notifyListeners();
+
+    // Auto-select preferred tracks
+    if (!_isDisposed) {
+      _selectPreferredSubtitle();
+      _selectPreferredAudio();
+    }
+  }
+
+  Future<void> changeQuality(int index) async {
+    if (index == _currentSourceIndex || index < 0 || index >= sources.length) {
+      return;
+    }
+
+    final currentPosition = player.state.position;
+    final wasPlaying = player.state.playing;
+
+    _currentSourceIndex = index;
+    notifyListeners();
+    _feedbackController.add(VideoFeedbackEvent(FeedbackType.quality, sources[index].quality));
+
+    await _loadSource(sources[index]);
+    await _waitForBufferAndSeek(currentPosition, wasPlaying);
+  }
+
+  Future<void> _waitForBufferAndSeek(Duration position, bool wasPlaying) async {
+    try {
+      // Wait for buffering to complete
+      await player.stream.buffering.where((b) => !b).first;
+    } catch (_) {}
+
+    if (!_isDisposed) {
+      await player.seek(position);
+      if (wasPlaying) await player.play();
+    }
+  }
+
+  Future<void> setVideoTrack(VideoTrack track) async {
+    await player.setVideoTrack(track);
+    final label = track.h != null ? '${track.h}p' : (track.title ?? 'Track ${track.id}');
+    _feedbackController.add(VideoFeedbackEvent(FeedbackType.quality, label));
+  }
+
+  Future<void> setAudioTrack(AudioTrack track) async {
+    await player.setAudioTrack(track);
+    if (track.id != 'no' && track.id != 'auto') {
+      _preferencesService?.set(PrefKey.audioPreference, track.title);
+    }
+    _feedbackController.add(
+      VideoFeedbackEvent(FeedbackType.audio, track.title ?? track.language ?? 'Track ${track.id}'),
+    );
+  }
+
+  Future<void> setSubtitleTrack(SubtitleTrack track) async {
+    _feedbackController.add(
+      VideoFeedbackEvent(FeedbackType.subtitle, track.title ?? track.language ?? 'Track ${track.id}'),
+    );
+    await player.setSubtitleTrack(track);
+    if (track.id != 'no' && track.id != 'auto') {
+      _preferencesService?.set(PrefKey.subtitlePreference, track.title);
+    }
+  }
+
+  Future<void> setPlaybackSpeed(double speed) async {
+    await player.setRate(speed);
+    _feedbackController.add(VideoFeedbackEvent(FeedbackType.speed, '${speed}x'));
+  }
+
+  Future<void> _selectPreferredSubtitle() async {
+    if (_externalSubtitles.isEmpty) return;
+    final savedPref = await _preferencesService?.get<String>(PrefKey.subtitlePreference);
+
+    SubtitleTrack? track = savedPref != null ? _externalSubtitles.where((s) => s.title == savedPref).firstOrNull : null;
+
+    track ??= _externalSubtitles
+        .where(
+          (s) =>
+              s.language?.toLowerCase() == 'en' ||
+              s.language?.toLowerCase() == 'eng' ||
+              (s.title?.toLowerCase().contains('english') ?? false),
+        )
+        .firstOrNull;
+
+    track ??= _externalSubtitles.firstOrNull;
+
+    if (track != null && !_isDisposed) {
+      await player.setSubtitleTrack(track);
+    }
+  }
+
+  Future<void> _selectPreferredAudio() async {
+    final tracks = player.state.tracks.audio.where((t) => t.id != 'auto' && t.id != 'no').toList();
+    if (tracks.isEmpty) return;
+
+    final savedPref = await _preferencesService?.get<String>(PrefKey.audioPreference);
+    final track = savedPref != null ? tracks.where((t) => t.title == savedPref).firstOrNull : null;
+
+    if (track != null && !_isDisposed) {
+      await player.setAudioTrack(track);
+    }
   }
 
   void _onPositionChanged(Duration position) {
-    if (_isDisposed) return;
+    if (_isDisposed || position.inSeconds <= 0) return;
 
     final now = DateTime.now();
-    final timeSinceLastSave = _lastSaveTime != null ? now.difference(_lastSaveTime!) : _saveInterval;
+    final elapsed = _lastSaveTime != null ? now.difference(_lastSaveTime!) : _saveInterval;
 
-    // Save progress every 10 seconds of playback
-    if (timeSinceLastSave >= _saveInterval && position != _lastSavedPosition && position.inSeconds > 0) {
+    if (elapsed >= _saveInterval && position != _lastSavedPosition) {
       _saveProgress(position);
       _lastSavedPosition = position;
       _lastSaveTime = now;
     }
+  }
+
+  Future<void> _saveProgress(Duration position) async {
+    if (_watchHistoryService == null ||
+        animeId == null ||
+        episodeId == null ||
+        episodeNumber == null ||
+        streamProviderName == null ||
+        metadataProviderName == null) {
+      return;
+    }
+
+    await _watchHistoryService.saveProgress(
+      WatchHistoryEntry(
+        animeId: animeId!,
+        episodeId: episodeId!,
+        episodeNumber: episodeNumber!,
+        streamProviderName: streamProviderName!,
+        metadataProviderName: metadataProviderName!,
+        positionMs: position.inMilliseconds,
+        durationMs: player.state.duration.inMilliseconds,
+        lastWatched: DateTime.now(),
+        animeTitle: animeTitle.isNotEmpty ? animeTitle : null,
+        episodeTitle: episodeTitle.isNotEmpty ? episodeTitle : null,
+      ),
+    );
   }
 
   Future<void> _loadSavedPosition() async {
@@ -164,298 +320,30 @@ class VideoPlayerViewModel extends ChangeNotifier {
       episodeNumber: episodeNumber,
     );
 
-    final targetPosition = result.position;
-    final isCrossProvider = result.isCrossProvider;
-    final matchDurationMs = result.matchDurationMs;
+    if (result.position == Duration.zero || _isDisposed) return;
 
-    if (targetPosition != Duration.zero && !_isDisposed) {
-      // Wait for the player to be ready with duration
-      StreamSubscription<Duration>? sub;
-      sub = player.stream.duration.listen((duration) {
-        if (duration != Duration.zero) {
-          bool shouldSeek = true;
+    // Wait for duration to be available
+    final duration = await player.stream.buffer
+        .where((bufferDuration) => bufferDuration > Duration.zero)
+        .first
+        .then((_) => player.state.duration);
 
-          // If it's a cross-provider match, verify duration similarity
-          if (isCrossProvider && matchDurationMs != null) {
-            final difference = (duration.inMilliseconds - matchDurationMs).abs();
-            // Allow 60 seconds difference (60,000 ms)
-            if (difference > 60000) {
-              shouldSeek = false;
-              debugPrint('Cross-provider sync skipped: Duration mismatch ($difference ms)');
-            }
-          }
-
-          if (shouldSeek) {
-            // Don't seek if we're near the end (> 98% watched)
-            if (targetPosition < duration * 0.98) {
-              player.seek(targetPosition);
-              debugPrint('Resumed playback at ${targetPosition.inSeconds}s${isCrossProvider ? ' (synced)' : ''}');
-            }
-          }
-          sub?.cancel();
-        }
-      });
-    }
-  }
-
-  Future<void> _saveProgress(Duration position) async {
-    if (_watchHistoryService == null ||
-        animeId == null ||
-        episodeId == null ||
-        episodeNumber == null ||
-        streamProviderName == null ||
-        metadataProviderName == null) {
-      return;
-    }
-
-    final entry = WatchHistoryEntry(
-      animeId: animeId!,
-      episodeId: episodeId!,
-      episodeNumber: episodeNumber!,
-      streamProviderName: streamProviderName!,
-      metadataProviderName: metadataProviderName!,
-      positionMs: position.inMilliseconds,
-      durationMs: _currentDuration.inMilliseconds,
-      lastWatched: DateTime.now(),
-      animeTitle: animeTitle.isNotEmpty ? animeTitle : null,
-      episodeTitle: episodeTitle.isNotEmpty ? episodeTitle : null,
-    );
-
-    await _watchHistoryService.saveProgress(entry);
-  }
-
-  String _getTitle() {
-    if (animeTitle.isNotEmpty && episodeTitle.isNotEmpty) {
-      return '$animeTitle - $episodeTitle';
-    }
-    return episodeTitle.isNotEmpty ? episodeTitle : 'Video Player';
-  }
-
-  int _getBestQualityIndex() {
-    int bestIndex = 0;
-    int bestQuality = 0;
-
-    for (int i = 0; i < sources.length; i++) {
-      // Extract number from "1080p", "720p" etc.
-      final qualityString = sources[i].quality.replaceAll(RegExp(r'[^\d]'), '');
-      final quality = int.tryParse(qualityString) ?? 0;
-
-      if (quality > bestQuality) {
-        bestQuality = quality;
-        bestIndex = i;
+    // Validate cross-provider match
+    if (result.isCrossProvider && result.matchDurationMs != null) {
+      if ((duration.inMilliseconds - result.matchDurationMs!).abs() > 60000) {
+        return;
       }
     }
 
-    return bestIndex;
-  }
-
-  Future<void> _loadSource(StreamingSource source) async {
-    if (_isDisposed) return;
-
-    // Auto-select tracks by default
-    await player.setVideoTrack(VideoTrack.auto());
-    await player.setAudioTrack(AudioTrack.auto());
-    await player.setSubtitleTrack(SubtitleTrack.no()); // Start with no subtitles
-
-    // Build external subtitle tracks from source
-    final List<SubtitleTrack> externalSubs = source.subtitles
-        .map((s) => SubtitleTrack.uri(s.url, title: s.label, language: s.language))
-        .toList();
-
-    // Open media
-    await player.open(Media(source.url));
-
-    // Store external subtitles for later access
-    if (externalSubs.isNotEmpty) {
-      _externalSubtitles = externalSubs;
-      notifyListeners();
-    }
-
-    // Auto-select preferred tracks after a short delay to let player initialize
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (!_isDisposed) {
-        _selectPreferredSubtitle();
-        _selectPreferredAudio();
-      }
-    });
-  }
-
-  /// Select subtitle based on priority: user preference > English > Auto
-  Future<void> _selectPreferredSubtitle() async {
-    if (_externalSubtitles.isEmpty) return;
-
-    // Get saved preference
-    final savedPref = await _getSavedSubtitlePreference();
-
-    SubtitleTrack? selectedTrack;
-
-    // Priority 1: User's saved preference (match by title)
-    if (savedPref != null) {
-      selectedTrack = _externalSubtitles.where((s) => s.title == savedPref).firstOrNull;
-    }
-
-    // Priority 2: English subtitle
-    selectedTrack ??= _externalSubtitles
-        .where(
-          (s) =>
-              s.language?.toLowerCase() == 'en' ||
-              s.language?.toLowerCase() == 'eng' ||
-              (s.title?.toLowerCase().contains('english') ?? false),
-        )
-        .firstOrNull;
-
-    // Priority 3: Fall back to first subtitle if nothing matches
-    if (selectedTrack == null && _externalSubtitles.isNotEmpty) {
-      selectedTrack = _externalSubtitles.first;
-    }
-
-    if (selectedTrack != null && !_isDisposed) {
-      await player.setSubtitleTrack(selectedTrack);
-      debugPrint('Auto-selected subtitle: ${selectedTrack.title}');
+    // Don't seek if near end (>99%)
+    if (result.position < duration * 0.99) {
+      await player.seek(result.position);
     }
   }
 
-  Future<String?> _getSavedSubtitlePreference() async {
-    return await _preferencesService?.get<String>(PrefKey.subtitlePreference);
-  }
-
-  Future<void> _saveSubtitlePreference(String? title) async {
-    if (title == null) return;
-    await _preferencesService?.set(PrefKey.subtitlePreference, title);
-  }
-
-  Future<String?> _getSavedAudioPreference() async {
-    return await _preferencesService?.get<String>(PrefKey.audioPreference);
-  }
-
-  Future<void> _saveAudioPreference(String? title) async {
-    if (title == null) return;
-    await _preferencesService?.set(PrefKey.audioPreference, title);
-  }
-
-  /// Select audio based on priority: user preference > Auto
-  Future<void> _selectPreferredAudio() async {
-    final tracks = player.state.tracks.audio.where((t) => t.id != 'auto' && t.id != 'no').toList();
-    if (tracks.isEmpty) return;
-
-    final savedPref = await _getSavedAudioPreference();
-
-    AudioTrack? selectedTrack;
-
-    // Priority 1: User's saved preference (match by title)
-    if (savedPref != null) {
-      selectedTrack = tracks.where((t) => t.title == savedPref).firstOrNull;
-    }
-
-    // Priority 2: Auto (don't change if no preference found)
-    if (selectedTrack != null && !_isDisposed) {
-      await player.setAudioTrack(selectedTrack);
-      debugPrint('Auto-selected audio: ${selectedTrack.title}');
-    }
-  }
-
-  // External subtitles loaded from the stream source
-  List<SubtitleTrack> _externalSubtitles = [];
-
-  List<SubtitleTrack> get externalSubtitles => _externalSubtitles;
-
-  Future<void> changeQuality(int index) async {
-    if (index == _currentSourceIndex || index < 0 || index >= sources.length) {
-      return;
-    }
-
-    final currentPosition = player.state.position;
-    final wasPlaying = player.state.playing;
-
-    _currentSourceIndex = index;
-    notifyListeners();
-
-    // Emit feedback
-    final qualityLabel = sources[index].quality;
-    _feedbackController.add(VideoFeedbackEvent(FeedbackType.quality, qualityLabel));
-
-    await _loadSource(sources[index]);
-
-    /// Wait for the source to buffer before seeking to the previous position.
-    /// This prevents the player from resetting to the start on some platforms.
-    await _waitForBufferingAndSeek(currentPosition, wasPlaying);
-  }
-
-  Future<void> _waitForBufferingAndSeek(Duration position, bool wasPlaying) async {
-    // Determine if we need to wait for buffering (Android/Mobile specific usually)
-    // We listen for the transition from buffering (true) -> buffering (false)
-    bool hasBuffered = false;
-    StreamSubscription<bool>? sub;
-
-    // Completer to wrap the stream listener in a Future
-    final completer = Completer<void>();
-
-    sub = player.stream.buffering.listen((isBuffering) {
-      if (isBuffering) {
-        hasBuffered = true;
-      } else if (hasBuffered) {
-        // Buffering finished
-        completer.complete();
-        sub?.cancel();
-      }
-    });
-
-    // Timeout safety: if buffering takes too long or never triggers (e.g. fast load), just seek.
-    // 5 seconds timeout seems reasonable for a quality switch.
-    try {
-      await completer.future.timeout(const Duration(seconds: 5));
-    } catch (_) {
-      // Timeout occurred, proceed anyway
-      sub.cancel();
-    }
-
-    if (!_isDisposed) {
-      await player.seek(position);
-      if (wasPlaying) await player.play();
-    }
-  }
-
-  StreamingSource get currentSource => sources[_currentSourceIndex];
-
-  // Track Selection Wrappers
-  Future<void> setVideoTrack(VideoTrack track) async {
-    await player.setVideoTrack(track);
-
-    // Emit feedback
-    String label = track.title ?? 'Track ${track.id}';
-    if (track.h != null) label = '${track.h}p';
-    _feedbackController.add(VideoFeedbackEvent(FeedbackType.quality, label));
-  }
-
-  Future<void> setAudioTrack(AudioTrack track) async {
-    await player.setAudioTrack(track);
-
-    // Save user's audio preference (by title for matching later)
-    if (track.id != 'no' && track.id != 'auto') {
-      _saveAudioPreference(track.title);
-    }
-
-    // Emit feedback
-    final label = track.title ?? track.language ?? 'Track ${track.id}';
-    _feedbackController.add(VideoFeedbackEvent(FeedbackType.audio, label));
-  }
-
-  Future<void> setSubtitleTrack(SubtitleTrack track) async {
-    // Immediate feedback
-    final label = track.title ?? track.language ?? 'Track ${track.id}';
-    _feedbackController.add(VideoFeedbackEvent(FeedbackType.subtitle, label));
-
-    await player.setSubtitleTrack(track);
-
-    // Save user's subtitle preference (by title for matching later)
-    if (track.id != 'no' && track.id != 'auto') {
-      _saveSubtitlePreference(track.title);
-    }
-  }
-
-  Future<void> setPlaybackSpeed(double speed) async {
-    await player.setRate(speed);
-    _feedbackController.add(VideoFeedbackEvent(FeedbackType.speed, '${speed}x'));
+  Future<void> _loadSavedVolume() async {
+    final volume = await _preferencesService?.get<double>(PrefKey.videoVolume);
+    if (volume != null) await player.setVolume(volume.clamp(0.0, 100.0));
   }
 
   Future<void> playEpisode({
@@ -467,7 +355,6 @@ class VideoPlayerViewModel extends ChangeNotifier {
   }) async {
     if (_isDisposed) return;
 
-    // Save progress for the current episode
     await _saveProgress(player.state.position);
 
     _episodeId = episodeId;
@@ -475,13 +362,10 @@ class VideoPlayerViewModel extends ChangeNotifier {
     _episodeTitle = episodeTitle;
     _sources = sources;
     _streamProviderName = streamProviderName;
-    _currentSourceIndex = 0;
 
-    // Reset state
     await player.stop();
     _externalSubtitles = [];
     _lastSavedPosition = Duration.zero;
-    _currentDuration = Duration.zero;
     _lastSaveTime = null;
 
     notifyListeners();
@@ -493,112 +377,43 @@ class VideoPlayerViewModel extends ChangeNotifier {
     }
   }
 
-  bool _isSavingThumbnail = false;
-  bool _pendingDispose = false;
-
-  @override
-  void dispose() {
-    // Save final position before disposing
-    if (!_isDisposed && player.state.position.inSeconds > 0) {
-      _saveProgress(player.state.position);
-    }
-
-    _isDisposed = true;
-    _positionSubscription?.cancel();
-    _durationSubscription?.cancel();
-    _volumeSubscription?.cancel();
-    _volumeSubscription?.cancel();
-    _volumeSaveDebounce?.cancel();
-    _stallDetectionTimer?.cancel();
-    _feedbackController.close();
-
-    // Only dispose player if we're not currently saving a thumbnail
-    if (_isSavingThumbnail) {
-      _pendingDispose = true;
-    } else {
-      player.dispose();
-    }
-
-    super.dispose();
-  }
-
-  /// Save current frame as episode thumbnail in background.
-  /// This method is non-blocking and handles player lifecycle internally.
   Future<void> saveThumbnail() async {
     if (_thumbnailService == null || streamProviderName == null || animeId == null || episodeId == null) {
       return;
     }
 
     _isSavingThumbnail = true;
-
     try {
-      // Capture screenshot from the video controller
-      // Use JPEG for faster compression and less lag on exit
       final screenshot = await controller.player.screenshot(format: 'image/jpeg');
       if (screenshot != null) {
         await _thumbnailService.saveThumbnail(streamProviderName!, animeId!, episodeId!, screenshot);
-        debugPrint('Saved episode thumbnail');
       }
     } catch (e) {
       debugPrint('Failed to save thumbnail: $e');
     } finally {
       _isSavingThumbnail = false;
-      // If the viewmodel was disposed while we were saving, dispose the player now
-      if (_pendingDispose) {
-        player.dispose();
-        debugPrint('Deferred player disposal complete');
-      }
+      if (_pendingDispose) player.dispose();
     }
   }
 
-  Future<void> _loadSavedVolume() async {
-    final savedVolume = await _preferencesService?.get<double>(PrefKey.videoVolume);
-    if (savedVolume != null) {
-      final volume = savedVolume.clamp(0.0, 100.0);
-      await player.setVolume(volume);
+  @override
+  void dispose() {
+    if (!_isDisposed && player.state.position.inSeconds > 0) {
+      _saveProgress(player.state.position);
     }
-  }
+    // Save volume on dispose
+    _preferencesService?.set(PrefKey.videoVolume, player.state.volume);
 
-  Future<void> _saveVolume(double volume) async {
-    await _preferencesService?.set(PrefKey.videoVolume, volume);
-  }
+    _isDisposed = true;
+    _subscriptions?.dispose();
+    _stallSubject.close();
+    _feedbackController.close();
 
-  void _startStallDetection() {
-    _stallDetectionTimer?.cancel();
-    // Check every 1 second as requested
-    _stallDetectionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_isDisposed) {
-        timer.cancel();
-        return;
-      }
-
-      final currentPos = player.state.position;
-      final isPlaying = player.state.playing;
-      final isBuffering = player.state.buffering;
-
-      // Logic: If playing AND not buffering AND position hasn't changed -> Stalled
-      if (isPlaying && !isBuffering) {
-        if (currentPos == _lastStallCheckPosition) {
-          if (!_isStalled) {
-            _isStalled = true;
-            notifyListeners();
-          }
-        } else {
-          // Position moved, so we are not stalled
-          if (_isStalled) {
-            _isStalled = false;
-            notifyListeners();
-          }
-        }
-      } else {
-        // If paused or already buffering, we rely on standard UI (or it's paused)
-        if (_isStalled) {
-          _isStalled = false;
-          notifyListeners();
-        }
-      }
-
-      _lastStallCheckPosition = currentPos;
-    });
+    if (_isSavingThumbnail) {
+      _pendingDispose = true;
+    } else {
+      player.dispose();
+    }
+    super.dispose();
   }
 }

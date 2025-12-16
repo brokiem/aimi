@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:provider/provider.dart';
+import 'package:rxdart/rxdart.dart';
 import 'package:side_sheet/side_sheet.dart';
 
 import '../models/anime_episode.dart';
@@ -20,8 +21,6 @@ class VideoPlayerView extends StatefulWidget {
   final String episodeTitle;
   final String animeTitle;
   final DetailViewModel detailViewModel;
-
-  // Watch history tracking identifiers
   final int? animeId;
   final String? episodeId;
   final String? episodeNumber;
@@ -47,71 +46,38 @@ class VideoPlayerView extends StatefulWidget {
 
 class _VideoPlayerViewState extends State<VideoPlayerView> {
   VideoPlayerViewModel? _viewModel;
+  bool _isLoadingEpisode = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-
-    // Initialize viewModel only once, after context is available
-    if (_viewModel == null) {
-      // Get WatchHistoryService from context (it's registered as non-nullable)
-      WatchHistoryService? watchHistoryService;
-      try {
-        watchHistoryService = context.read<WatchHistoryService>();
-      } catch (e) {
-        // Service not available, continue without it
-        debugPrint('WatchHistoryService not available: $e');
-      }
-
-      // Get PreferencesService
-      PreferencesService? preferencesService;
-      try {
-        preferencesService = context.read<PreferencesService>();
-      } catch (e) {
-        debugPrint('PreferencesService not available: $e');
-      }
-
-      // Get ThumbnailService
-      ThumbnailService? thumbnailService;
-      try {
-        thumbnailService = context.read<ThumbnailService>();
-      } catch (e) {
-        debugPrint('ThumbnailService not available: $e');
-      }
-
-      _viewModel = VideoPlayerViewModel(
-        sources: widget.sources,
-        episodeTitle: widget.episodeTitle,
-        animeTitle: widget.animeTitle,
-        watchHistoryService: watchHistoryService,
-        preferencesService: preferencesService,
-        thumbnailService: thumbnailService,
-        animeId: widget.animeId,
-        episodeId: widget.episodeId,
-        episodeNumber: widget.episodeNumber,
-        streamProviderName: widget.streamProviderName,
-        metadataProviderName: widget.metadataProviderName,
-      );
-    }
+    _viewModel ??= VideoPlayerViewModel(
+      sources: widget.sources,
+      episodeTitle: widget.episodeTitle,
+      animeTitle: widget.animeTitle,
+      watchHistoryService: context.read<WatchHistoryService?>(),
+      preferencesService: context.read<PreferencesService?>(),
+      thumbnailService: context.read<ThumbnailService?>(),
+      animeId: widget.animeId,
+      episodeId: widget.episodeId,
+      episodeNumber: widget.episodeNumber,
+      streamProviderName: widget.streamProviderName,
+      metadataProviderName: widget.metadataProviderName,
+    );
   }
 
   @override
   void dispose() {
-    // Save thumbnail before disposing (fire and forget)
     _viewModel?.saveThumbnail();
     _viewModel?.dispose();
     super.dispose();
   }
 
-  bool _isLoadingEpisode = false;
-
   Future<void> _onEpisodeTap(AnimeEpisode episode) async {
     final viewModel = _viewModel;
-    if (viewModel == null || _isLoadingEpisode) return; // Prevent multiple taps
+    if (viewModel == null || _isLoadingEpisode) return;
 
-    setState(() {
-      _isLoadingEpisode = true;
-    });
+    setState(() => _isLoadingEpisode = true);
 
     try {
       await widget.detailViewModel.loadSources(episode);
@@ -135,11 +101,7 @@ class _VideoPlayerViewState extends State<VideoPlayerView> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load episode: $e')));
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingEpisode = false;
-        });
-      }
+      if (mounted) setState(() => _isLoadingEpisode = false);
     }
   }
 
@@ -165,34 +127,33 @@ class _VideoPlayerViewState extends State<VideoPlayerView> {
               ),
             ),
             Expanded(
-              child: ListenableBuilder(
-                listenable: widget.detailViewModel,
-                builder: (context, _) {
-                  return AnimeProviderContent(
-                    anime: widget.detailViewModel.anime,
-                    availableProviders: widget.detailViewModel.availableProviders,
-                    currentProvider: widget.detailViewModel.currentProviderName,
-                    getEpisodes: (p) => widget.detailViewModel.getEpisodesForProvider(p) ?? [],
-                    isProviderLoading: widget.detailViewModel.isProviderLoading,
-                    getEpisodeCount: widget.detailViewModel.getEpisodeCountForProvider,
-                    onProviderSelected: (index) {
-                      widget.detailViewModel.switchProvider(index);
-                    },
-                    errorMessage: widget.detailViewModel.errorMessage,
-                    onRetry: () => widget.detailViewModel.loadAnime(forceRefresh: true),
-                    onEpisodeTap: (episode) async {
-                      Navigator.pop(context); // Close sheet
-                      await _onEpisodeTap(episode);
-                    },
-                    // No scroll controller needed for SideSheet usually as Content handles it,
-                    // or we pass null if it expects one.
-                    // AnimeProviderContent usually has its own list view.
-                  );
+              child: _buildEpisodeList(
+                onTap: (ep) async {
+                  Navigator.pop(context);
+                  await _onEpisodeTap(ep);
                 },
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildEpisodeList({required Future<void> Function(AnimeEpisode) onTap}) {
+    return ListenableBuilder(
+      listenable: widget.detailViewModel,
+      builder: (context, _) => AnimeProviderContent(
+        anime: widget.detailViewModel.anime,
+        availableProviders: widget.detailViewModel.availableProviders,
+        currentProvider: widget.detailViewModel.currentProviderName,
+        getEpisodes: (p) => widget.detailViewModel.getEpisodesForProvider(p) ?? [],
+        isProviderLoading: widget.detailViewModel.isProviderLoading,
+        getEpisodeCount: widget.detailViewModel.getEpisodeCountForProvider,
+        onProviderSelected: widget.detailViewModel.switchProvider,
+        errorMessage: widget.detailViewModel.errorMessage,
+        onRetry: () => widget.detailViewModel.loadAnime(forceRefresh: true),
+        onEpisodeTap: onTap,
       ),
     );
   }
@@ -217,44 +178,24 @@ class _VideoPlayerViewState extends State<VideoPlayerView> {
             final isPortrait = orientation == Orientation.portrait;
 
             if (isPortrait) {
-              // Mobile/Portrait Layout: Split View
               return SafeArea(
                 child: Column(
                   children: [
                     AspectRatio(
                       aspectRatio: 16 / 9,
-                      child: _buildVideoPlayer(context, viewModel, showEpisodesButton: false, bottomSafeArea: false),
+                      child: _buildVideoPlayer(viewModel, showEpisodesButton: false, bottomSafeArea: false),
                     ),
                     Expanded(
                       child: Container(
                         color: Theme.of(context).colorScheme.surface,
-                        child: ListenableBuilder(
-                          listenable: widget.detailViewModel,
-                          builder: (context, _) {
-                            return AnimeProviderContent(
-                              anime: widget.detailViewModel.anime,
-                              availableProviders: widget.detailViewModel.availableProviders,
-                              currentProvider: widget.detailViewModel.currentProviderName,
-                              getEpisodes: (p) => widget.detailViewModel.getEpisodesForProvider(p) ?? [],
-                              isProviderLoading: widget.detailViewModel.isProviderLoading,
-                              getEpisodeCount: widget.detailViewModel.getEpisodeCountForProvider,
-                              onProviderSelected: (index) {
-                                widget.detailViewModel.switchProvider(index);
-                              },
-                              errorMessage: widget.detailViewModel.errorMessage,
-                              onRetry: () => widget.detailViewModel.loadAnime(forceRefresh: true),
-                              onEpisodeTap: _onEpisodeTap,
-                            );
-                          },
-                        ),
+                        child: _buildEpisodeList(onTap: _onEpisodeTap),
                       ),
                     ),
                   ],
                 ),
               );
             } else {
-              // Desktop/Landscape Layout: Fullscreen with Overlay Sheet
-              return Center(child: _buildVideoPlayer(context, viewModel, showEpisodesButton: true));
+              return Center(child: _buildVideoPlayer(viewModel, showEpisodesButton: true));
             }
           },
         ),
@@ -263,7 +204,6 @@ class _VideoPlayerViewState extends State<VideoPlayerView> {
   }
 
   Widget _buildVideoPlayer(
-    BuildContext context,
     VideoPlayerViewModel viewModel, {
     required bool showEpisodesButton,
     bool bottomSafeArea = true,
@@ -277,7 +217,6 @@ class _VideoPlayerViewState extends State<VideoPlayerView> {
               controller: viewModel.controller,
               controls: (state) => VideoPlayerControls(
                 controller: viewModel.controller,
-                // Fix: Use viewModel.controller
                 videoTitle: '${widget.animeTitle} - ${viewModel.episodeTitle}',
                 onBack: () => Navigator.pop(context),
                 onSettingsPressed: () => _showSettings(context),
@@ -293,24 +232,21 @@ class _VideoPlayerViewState extends State<VideoPlayerView> {
               ),
           ],
         ),
-        // Buffering/Stall indicator
+        // Buffering/Stall indicator using combined stream
         StreamBuilder<bool>(
-          stream: viewModel.player.stream.buffering,
+          stream: Rx.merge([
+            viewModel.player.stream.buffering,
+            viewModel.stallStream,
+          ]).map((_) => viewModel.player.state.buffering || viewModel.isStalled),
           builder: (context, snapshot) {
-            final isBuffering = snapshot.data ?? false;
-            return Selector<VideoPlayerViewModel, bool>(
-              selector: (_, vm) => vm.isStalled,
-              builder: (context, isStalled, _) {
-                if (isBuffering || isStalled) {
-                  return const SizedBox(
-                    width: 75,
-                    height: 75,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 4),
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            );
+            if (snapshot.data == true) {
+              return const SizedBox(
+                width: 75,
+                height: 75,
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 4),
+              );
+            }
+            return const SizedBox.shrink();
           },
         ),
       ],
@@ -318,56 +254,46 @@ class _VideoPlayerViewState extends State<VideoPlayerView> {
   }
 
   void _showSettings(BuildContext context) {
+    final viewModel = _viewModel!;
+    final player = viewModel.player;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => ChangeNotifierProvider.value(
-        value: _viewModel,
-        child: Consumer<VideoPlayerViewModel>(
-          builder: (context, viewModel, child) {
-            final player = viewModel.player;
-
-            // Use player.state for initial values (synchronous read)
-            return StreamBuilder<Tracks>(
-              stream: player.stream.tracks,
-              initialData: player.state.tracks,
-              builder: (context, snapshotTracks) {
-                final tracks = snapshotTracks.data ?? player.state.tracks;
-
-                return StreamBuilder<Track>(
-                  stream: player.stream.track,
-                  initialData: player.state.track,
-                  builder: (context, snapshotTrack) {
-                    final selectedTrack = snapshotTrack.data ?? player.state.track;
-
-                    return StreamBuilder<double>(
-                      stream: player.stream.rate,
-                      initialData: player.state.rate,
-                      builder: (context, snapshotRate) {
-                        final rate = snapshotRate.data ?? player.state.rate;
-
-                        return VideoSettingsSheet(
-                          sources: viewModel.sources,
-                          currentSource: viewModel.currentSource,
-                          onQualitySelected: (index) => viewModel.changeQuality(index),
-                          playbackSpeed: rate,
-                          onPlaybackSpeedSelected: (speed) => viewModel.setPlaybackSpeed(speed),
-                          tracks: tracks,
-                          selectedTrack: selectedTrack,
-                          externalSubtitles: viewModel.externalSubtitles,
-                          onVideoTrackSelected: (track) => viewModel.setVideoTrack(track),
-                          onAudioTrackSelected: (track) => viewModel.setAudioTrack(track),
-                          onSubtitleTrackSelected: (track) => viewModel.setSubtitleTrack(track),
-                        );
-                      },
-                    );
-                  },
-                );
-              },
-            );
-          },
+      builder: (context) => StreamBuilder<_SettingsData>(
+        stream: Rx.combineLatest3(
+          player.stream.tracks,
+          player.stream.track,
+          player.stream.rate,
+          (tracks, track, rate) => _SettingsData(tracks, track, rate),
         ),
+        initialData: _SettingsData(player.state.tracks, player.state.track, player.state.rate),
+        builder: (context, snapshot) {
+          final data = snapshot.data!;
+          return VideoSettingsSheet(
+            sources: viewModel.sources,
+            currentSource: viewModel.currentSource,
+            onQualitySelected: viewModel.changeQuality,
+            playbackSpeed: data.rate,
+            onPlaybackSpeedSelected: viewModel.setPlaybackSpeed,
+            tracks: data.tracks,
+            selectedTrack: data.track,
+            externalSubtitles: viewModel.externalSubtitles,
+            onVideoTrackSelected: viewModel.setVideoTrack,
+            onAudioTrackSelected: viewModel.setAudioTrack,
+            onSubtitleTrackSelected: viewModel.setSubtitleTrack,
+          );
+        },
       ),
     );
   }
+}
+
+/// Data class for combining settings streams
+class _SettingsData {
+  final Tracks tracks;
+  final Track track;
+  final double rate;
+
+  const _SettingsData(this.tracks, this.track, this.rate);
 }
