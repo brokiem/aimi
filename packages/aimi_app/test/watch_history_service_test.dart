@@ -6,15 +6,15 @@ import 'test_helpers.dart';
 
 void main() {
   late WatchHistoryService service;
-  late FakeCachingService fakeCachingService;
+  late FakeStorageService fakeStorageService;
 
   setUp(() {
-    fakeCachingService = FakeCachingService();
-    service = WatchHistoryService(fakeCachingService);
+    fakeStorageService = FakeStorageService();
+    service = WatchHistoryService(fakeStorageService);
   });
 
   tearDown(() {
-    fakeCachingService.clear();
+    fakeStorageService.clear();
   });
 
   // ===========================================================================
@@ -204,7 +204,11 @@ void main() {
 
         await service.saveProgress(entry);
 
-        final retrieved = await service.getProgress('TestStreamProvider', 1, 'ep-1');
+        final retrieved = await service.getProgress(
+          'TestStreamProvider',
+          1,
+          'ep-1',
+        );
         expect(retrieved, isNotNull);
         expect(retrieved!.animeId, 1);
         expect(retrieved.episodeId, 'ep-1');
@@ -245,7 +249,11 @@ void main() {
     // =========================================================================
     group('Completion', () {
       test('isWatched returns false for unwatched episode', () async {
-        final watched = await service.isWatched('TestStreamProvider', 1, 'ep-1');
+        final watched = await service.isWatched(
+          'TestStreamProvider',
+          1,
+          'ep-1',
+        );
         expect(watched, false);
       });
 
@@ -264,7 +272,11 @@ void main() {
 
         await service.saveProgress(entry);
 
-        final watched = await service.isWatched('TestStreamProvider', 1, 'ep-1');
+        final watched = await service.isWatched(
+          'TestStreamProvider',
+          1,
+          'ep-1',
+        );
         expect(watched, true);
       });
 
@@ -283,7 +295,11 @@ void main() {
 
         await service.saveProgress(entry);
 
-        final watched = await service.isWatched('TestStreamProvider', 1, 'ep-1');
+        final watched = await service.isWatched(
+          'TestStreamProvider',
+          1,
+          'ep-1',
+        );
         expect(watched, false);
       });
 
@@ -301,7 +317,11 @@ void main() {
 
         await service.markAsWatched(entry);
 
-        final watched = await service.isWatched('TestStreamProvider', 1, 'ep-1');
+        final watched = await service.isWatched(
+          'TestStreamProvider',
+          1,
+          'ep-1',
+        );
         expect(watched, true);
       });
     });
@@ -336,8 +356,16 @@ void main() {
         await service.saveProgress(entryA);
         await service.saveProgress(entryB);
 
-        final progressA = await service.getProgress('StreamProviderA', 1, 'ep-1');
-        final progressB = await service.getProgress('StreamProviderB', 1, 'ep-1');
+        final progressA = await service.getProgress(
+          'StreamProviderA',
+          1,
+          'ep-1',
+        );
+        final progressB = await service.getProgress(
+          'StreamProviderB',
+          1,
+          'ep-1',
+        );
 
         expect(progressA!.positionMs, 60000);
         expect(progressB!.positionMs, 120000);
@@ -430,7 +458,10 @@ void main() {
           ),
         );
 
-        final watched = await service.getWatchedEpisodesForAnime('TestStreamProvider', 1);
+        final watched = await service.getWatchedEpisodesForAnime(
+          'TestStreamProvider',
+          1,
+        );
 
         expect(watched.length, 1);
         expect(watched[0].episodeNumber, '1');
@@ -452,7 +483,11 @@ void main() {
 
         await service.clearProgress('TestStreamProvider', 1, 'ep-1');
 
-        final progress = await service.getProgress('TestStreamProvider', 1, 'ep-1');
+        final progress = await service.getProgress(
+          'TestStreamProvider',
+          1,
+          'ep-1',
+        );
         expect(progress, isNull);
       });
 
@@ -550,30 +585,33 @@ void main() {
         expect(result.isCrossProvider, isFalse);
       });
 
-      test('getResumePosition falls back to cross-provider when no exact match', () async {
-        await service.saveProgress(
-          WatchHistoryEntry(
+      test(
+        'getResumePosition falls back to cross-provider when no exact match',
+        () async {
+          await service.saveProgress(
+            WatchHistoryEntry(
+              animeId: 1,
+              episodeId: 'old-ep',
+              episodeNumber: '1',
+              streamProviderName: 'OldProvider',
+              metadataProviderName: 'Meta',
+              positionMs: 90000,
+              durationMs: 1200000,
+              lastWatched: DateTime.now(),
+            ),
+          );
+
+          final result = await service.getResumePosition(
+            providerName: 'NewProvider',
             animeId: 1,
-            episodeId: 'old-ep',
+            episodeId: 'new-ep',
             episodeNumber: '1',
-            streamProviderName: 'OldProvider',
-            metadataProviderName: 'Meta',
-            positionMs: 90000,
-            durationMs: 1200000,
-            lastWatched: DateTime.now(),
-          ),
-        );
+          );
 
-        final result = await service.getResumePosition(
-          providerName: 'NewProvider',
-          animeId: 1,
-          episodeId: 'new-ep',
-          episodeNumber: '1',
-        );
-
-        expect(result.position, const Duration(milliseconds: 90000));
-        expect(result.isCrossProvider, isTrue);
-      });
+          expect(result.position, const Duration(milliseconds: 90000));
+          expect(result.isCrossProvider, isTrue);
+        },
+      );
 
       test('getResumePosition uses cross-provider if it is newer', () async {
         // Old exact match - save first

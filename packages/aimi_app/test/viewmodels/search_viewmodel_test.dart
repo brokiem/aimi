@@ -7,12 +7,18 @@ void main() {
   group('SearchViewModel', () {
     late SearchViewModel viewModel;
     late FakeAnimeService fakeAnimeService;
+    late FakeSearchHistoryService fakeSearchHistoryService;
 
     setUp(() async {
       fakeAnimeService = FakeAnimeService();
-      viewModel = SearchViewModel(fakeAnimeService);
+      fakeSearchHistoryService = FakeSearchHistoryService();
+      viewModel = SearchViewModel(fakeAnimeService, fakeSearchHistoryService);
       // Wait for async history load in constructor
       await Future.delayed(Duration.zero);
+    });
+
+    tearDown(() {
+      fakeSearchHistoryService.clear();
     });
 
     // =========================================================================
@@ -74,7 +80,9 @@ void main() {
       });
 
       test('empty query is ignored', () async {
-        fakeAnimeService.setSearchResults([TestAnimeFactory.createAnime(id: 1)]);
+        fakeAnimeService.setSearchResults([
+          TestAnimeFactory.createAnime(id: 1),
+        ]);
 
         await viewModel.search('');
 
@@ -83,7 +91,9 @@ void main() {
       });
 
       test('whitespace-only query is ignored', () async {
-        fakeAnimeService.setSearchResults([TestAnimeFactory.createAnime(id: 1)]);
+        fakeAnimeService.setSearchResults([
+          TestAnimeFactory.createAnime(id: 1),
+        ]);
 
         await viewModel.search('   ');
 
@@ -132,9 +142,9 @@ void main() {
     // =========================================================================
     group('History', () {
       test('removeFromHistory removes query', () async {
-        await fakeAnimeService.addToSearchHistory('keep');
-        await fakeAnimeService.addToSearchHistory('remove');
-        viewModel = SearchViewModel(fakeAnimeService);
+        await fakeSearchHistoryService.addToHistory('keep');
+        await fakeSearchHistoryService.addToHistory('remove');
+        viewModel = SearchViewModel(fakeAnimeService, fakeSearchHistoryService);
         await Future.delayed(Duration.zero);
 
         await viewModel.removeFromHistory('remove');
@@ -144,9 +154,9 @@ void main() {
       });
 
       test('clearHistory removes all history', () async {
-        await fakeAnimeService.addToSearchHistory('one');
-        await fakeAnimeService.addToSearchHistory('two');
-        viewModel = SearchViewModel(fakeAnimeService);
+        await fakeSearchHistoryService.addToHistory('one');
+        await fakeSearchHistoryService.addToHistory('two');
+        viewModel = SearchViewModel(fakeAnimeService, fakeSearchHistoryService);
         await Future.delayed(Duration.zero);
 
         await viewModel.clearHistory();
@@ -155,9 +165,9 @@ void main() {
       });
 
       test('duplicate search moves query to top of history', () async {
-        await fakeAnimeService.addToSearchHistory('first');
-        await fakeAnimeService.addToSearchHistory('second');
-        viewModel = SearchViewModel(fakeAnimeService);
+        await fakeSearchHistoryService.addToHistory('first');
+        await fakeSearchHistoryService.addToHistory('second');
+        viewModel = SearchViewModel(fakeAnimeService, fakeSearchHistoryService);
         await Future.delayed(Duration.zero);
 
         fakeAnimeService.setSearchResults([]);
@@ -173,7 +183,9 @@ void main() {
     // =========================================================================
     group('clearResults', () {
       test('clears search results', () async {
-        fakeAnimeService.setSearchResults([TestAnimeFactory.createAnime(id: 1)]);
+        fakeAnimeService.setSearchResults([
+          TestAnimeFactory.createAnime(id: 1),
+        ]);
         await viewModel.search('test');
 
         viewModel.clearResults();
@@ -219,10 +231,10 @@ void main() {
     // =========================================================================
     group('Listeners', () {
       test('notifies when history loads', () async {
-        await fakeAnimeService.addToSearchHistory('test');
+        await fakeSearchHistoryService.addToHistory('test');
 
         int notifyCount = 0;
-        final vm = SearchViewModel(fakeAnimeService);
+        final vm = SearchViewModel(fakeAnimeService, fakeSearchHistoryService);
         vm.addListener(() => notifyCount++);
 
         await Future.delayed(const Duration(milliseconds: 50));

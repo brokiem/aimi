@@ -9,18 +9,18 @@ void main() {
     late HistoryViewModel viewModel;
     late FakeWatchHistoryService fakeWatchHistoryService;
     late FakeAnimeService fakeAnimeService;
-    late FakeCachingService fakeCachingService;
+    late FakeStorageService fakeStorageService;
 
     setUp(() {
-      fakeCachingService = FakeCachingService();
-      fakeWatchHistoryService = FakeWatchHistoryService(fakeCachingService);
+      fakeStorageService = FakeStorageService();
+      fakeWatchHistoryService = FakeWatchHistoryService(fakeStorageService);
       fakeAnimeService = FakeAnimeService();
       viewModel = HistoryViewModel(fakeWatchHistoryService, fakeAnimeService);
     });
 
     tearDown(() {
       viewModel.dispose();
-      fakeCachingService.clear();
+      fakeStorageService.clear();
     });
 
     // =========================================================================
@@ -62,7 +62,10 @@ void main() {
           ),
         );
 
-        fakeAnimeService.setAnimeById(1, TestAnimeFactory.createAnime(id: 1, englishTitle: 'Test Anime'));
+        fakeAnimeService.setAnimeById(
+          1,
+          TestAnimeFactory.createAnime(id: 1, englishTitle: 'Test Anime'),
+        );
 
         await viewModel.fetchWatchHistory();
 
@@ -216,7 +219,10 @@ void main() {
     group('Dispose', () {
       test('dispose cancels subscription without error', () {
         // Create a separate ViewModel for this test to avoid double dispose
-        final testVM = HistoryViewModel(fakeWatchHistoryService, fakeAnimeService);
+        final testVM = HistoryViewModel(
+          fakeWatchHistoryService,
+          fakeAnimeService,
+        );
         expect(() => testVM.dispose(), returnsNormally);
       });
     });

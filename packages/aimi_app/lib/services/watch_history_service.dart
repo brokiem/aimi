@@ -1,16 +1,13 @@
 import 'dart:async';
 
 import '../models/watch_history_entry.dart';
-import 'caching_service.dart';
+import 'storage_service.dart';
 
 /// Service for managing watch history and playback progress.
 ///
-/// Uses [CachingService] for persistent storage with provider-specific keys.
+/// Uses [StorageService] for persistent storage with provider-specific keys.
 class WatchHistoryService {
-  final CachingService _cachingService;
-
-  /// Key prefix for progress entries
-  static const String _progressPrefix = 'watch_progress';
+  final StorageService _storageService;
 
   /// Maximum number of entries to keep in history
   static const int _maxHistoryEntries = 100;
@@ -18,16 +15,16 @@ class WatchHistoryService {
   /// Threshold for marking an episode as completed (96%)
   static const double completionThreshold = 0.96;
 
-  WatchHistoryService(this._cachingService);
+  WatchHistoryService(this._storageService);
 
   final _updateController = StreamController<WatchHistoryEntry>.broadcast();
 
   /// Stream of watch history entries that have been updated.
   Stream<WatchHistoryEntry> get onProgressUpdated => _updateController.stream;
 
-  /// Generate the cache key for a specific episode's progress.
-  String _progressKey(int animeId, String episodeId) {
-    return '$_progressPrefix/$animeId/$episodeId';
+  /// Generate the dynamic key for a specific episode's progress.
+  String _progressDynamicKey(int animeId, String episodeId) {
+    return '$animeId/$episodeId';
   }
 
   /// Save playback progress for an episode.
@@ -39,9 +36,10 @@ class WatchHistoryService {
     final updatedEntry = entry.copyWith(isCompleted: isCompleted, lastWatched: DateTime.now());
 
     // Save progress
-    final key = _progressKey(entry.animeId, entry.episodeId);
-    await _cachingService.saveData(
-      dynamicKey: key,
+    final dynamicKey = _progressDynamicKey(entry.animeId, entry.episodeId);
+    await _storageService.saveDynamic(
+      key: StorageKey.watchProgress,
+      dynamicKey: dynamicKey,
       data: updatedEntry.toJson(),
       providerName: entry.streamProviderName,
     );
@@ -57,8 +55,12 @@ class WatchHistoryService {
   ///
   /// Returns null if no progress is saved.
   Future<WatchHistoryEntry?> getProgress(String providerName, int animeId, String episodeId) async {
-    final key = _progressKey(animeId, episodeId);
-    final data = await _cachingService.getData(dynamicKey: key, providerName: providerName);
+    final dynamicKey = _progressDynamicKey(animeId, episodeId);
+    final data = await _storageService.getDynamic(
+      key: StorageKey.watchProgress,
+      dynamicKey: dynamicKey,
+      providerName: providerName,
+    );
     if (data != null) {
       return WatchHistoryEntry.fromJson(Map<String, dynamic>.from(data));
     }
@@ -97,9 +99,10 @@ class WatchHistoryService {
   /// Mark an episode as watched (completed).
   Future<void> markAsWatched(WatchHistoryEntry entry) async {
     final updatedEntry = entry.copyWith(isCompleted: true, lastWatched: DateTime.now());
-    final key = _progressKey(entry.animeId, entry.episodeId);
-    await _cachingService.saveData(
-      dynamicKey: key,
+    final dynamicKey = _progressDynamicKey(entry.animeId, entry.episodeId);
+    await _storageService.saveDynamic(
+      key: StorageKey.watchProgress,
+      dynamicKey: dynamicKey,
       data: updatedEntry.toJson(),
       providerName: entry.streamProviderName,
     );
@@ -114,7 +117,7 @@ class WatchHistoryService {
 
   /// Get the watch history list, sorted by most recently watched.
   Future<List<WatchHistoryEntry>> getWatchHistory({int? limit}) async {
-    final data = await _cachingService.getData(cacheKey: CacheKey.watchHistory);
+    final data = await _storageService.get(key: StorageKey.watchHistory);
     if (data == null) return [];
 
     final List<dynamic> historyList = data as List<dynamic>;
@@ -148,18 +151,22 @@ class WatchHistoryService {
     final trimmed = history.take(_maxHistoryEntries).toList();
 
     // Save updated history
-    await _cachingService.saveData(cacheKey: CacheKey.watchHistory, data: trimmed.map((e) => e.toJson()).toList());
+    await _storageService.save(key: StorageKey.watchHistory, data: trimmed.map((e) => e.toJson()).toList());
   }
 
   /// Clear all watch progress for a specific episode.
   Future<void> clearProgress(String providerName, int animeId, String episodeId) async {
-    final key = _progressKey(animeId, episodeId);
-    await _cachingService.removeData(dynamicKey: key, providerName: providerName);
+    final dynamicKey = _progressDynamicKey(animeId, episodeId);
+    await _storageService.removeDynamic(
+      key: StorageKey.watchProgress,
+      dynamicKey: dynamicKey,
+      providerName: providerName,
+    );
   }
 
   /// Clear all watch history.
   Future<void> clearHistory() async {
-    await _cachingService.removeData(cacheKey: CacheKey.watchHistory);
+    await _storageService.remove(key: StorageKey.watchHistory);
   }
 
   /// Get the best resume position for an episode, checking both exact provider match

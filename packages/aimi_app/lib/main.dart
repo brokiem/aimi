@@ -1,6 +1,8 @@
 import 'package:aimi_app/services/anime_service.dart';
 import 'package:aimi_app/services/caching_service.dart';
 import 'package:aimi_app/services/preferences_service.dart';
+import 'package:aimi_app/services/search_history_service.dart';
+import 'package:aimi_app/services/storage_service.dart';
 import 'package:aimi_app/services/stream_provider_registry.dart';
 import 'package:aimi_app/services/streaming_service.dart';
 import 'package:aimi_app/services/theme_service.dart';
@@ -36,10 +38,13 @@ class AimiApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Instantiate services
+    final storageService = StorageService();
     final cachingService = CachingService();
-    final animeService = AnimeService([AniListProvider()], cachingService);
+    final animeService = AnimeService([AniListProvider()], cachingService, storageService);
+
     final preferencesService = PreferencesService();
-    final watchHistoryService = WatchHistoryService(cachingService);
+    final searchHistoryService = SearchHistoryService(storageService);
+    final watchHistoryService = WatchHistoryService(storageService);
     final themeService = ThemeService(preferencesService);
     final thumbnailService = ThumbnailService();
 
@@ -55,14 +60,17 @@ class AimiApp extends StatelessWidget {
         Provider<StreamingService>.value(value: streamingService),
         Provider<StreamProviderRegistry>.value(value: streamProviderRegistry),
         Provider<CachingService>.value(value: cachingService),
+        Provider<StorageService>.value(value: storageService),
         Provider<PreferencesService>.value(value: preferencesService),
+        Provider<SearchHistoryService>.value(value: searchHistoryService),
         Provider<WatchHistoryService>.value(value: watchHistoryService),
         ChangeNotifierProvider<ThemeService>.value(value: themeService),
         Provider<ThumbnailService>.value(value: thumbnailService),
         ChangeNotifierProvider(create: (_) => HomeViewModel(animeService)),
         ChangeNotifierProvider(create: (_) => HistoryViewModel(watchHistoryService, animeService)),
-        ChangeNotifierProvider(create: (_) => SearchViewModel(animeService)),
+        ChangeNotifierProvider(create: (_) => SearchViewModel(animeService, searchHistoryService)),
       ],
+
       child: Consumer<ThemeService>(
         builder: (context, themeService, child) {
           return MaterialApp(

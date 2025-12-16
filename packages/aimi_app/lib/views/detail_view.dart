@@ -16,7 +16,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/anime.dart';
 import '../models/anime_episode.dart';
 import '../services/anime_service.dart';
-import '../services/caching_service.dart';
+import '../services/storage_service.dart';
 import '../services/stream_provider_registry.dart';
 import '../services/streaming_service.dart';
 import 'video_player_view.dart';
@@ -111,13 +111,17 @@ class _DetailViewState extends State<DetailView> with TickerProviderStateMixin {
       }
 
       if (context.mounted) {
-        final cachingService = context.read<CachingService>();
+        final storageService = context.read<StorageService>();
         // Import AnimeService is already visible via provider
         final animeService = context.read<AnimeService>();
 
-        // Cache the anime data permanently for watch history
-        final cacheKey = 'watched_anime/${viewModel.anime.id}';
-        await cachingService.saveData(dynamicKey: cacheKey, data: viewModel.anime.toJson());
+        // Store the anime data permanently for watch history
+        await storageService.saveDynamic(
+          key: StorageKey.animeDetails,
+          dynamicKey: viewModel.anime.id.toString(),
+          data: viewModel.anime.toJson(),
+          providerName: animeService.providerName,
+        );
 
         if (context.mounted) {
           await Navigator.of(context).push(

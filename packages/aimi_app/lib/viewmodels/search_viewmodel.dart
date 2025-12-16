@@ -2,11 +2,13 @@ import 'package:flutter/foundation.dart';
 
 import '../models/anime.dart';
 import '../services/anime_service.dart';
+import '../services/search_history_service.dart';
 
 class SearchViewModel extends ChangeNotifier {
   final AnimeService _animeService;
+  final SearchHistoryService _searchHistoryService;
 
-  SearchViewModel(this._animeService) {
+  SearchViewModel(this._animeService, this._searchHistoryService) {
     _loadHistory();
   }
 
@@ -31,17 +33,17 @@ class SearchViewModel extends ChangeNotifier {
   bool get hasSearched => _hasSearched;
 
   Future<void> _loadHistory() async {
-    _history = await _animeService.getSearchHistory();
+    _history = await _searchHistoryService.getHistory();
     notifyListeners();
   }
 
   Future<void> removeFromHistory(String query) async {
-    await _animeService.removeFromSearchHistory(query);
+    await _searchHistoryService.removeFromHistory(query);
     await _loadHistory(); // Reload to update UI
   }
 
   Future<void> clearHistory() async {
-    await _animeService.clearSearchHistory();
+    await _searchHistoryService.clearHistory();
     await _loadHistory();
   }
 
@@ -54,7 +56,7 @@ class SearchViewModel extends ChangeNotifier {
       _hasSearched = true;
       notifyListeners();
 
-      await _animeService.addToSearchHistory(query);
+      await _searchHistoryService.addToHistory(query);
       // Reload history to show the new item immediately if we switch views or it's visible
       _loadHistory();
 
