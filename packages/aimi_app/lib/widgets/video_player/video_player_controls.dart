@@ -152,7 +152,7 @@ class _VideoPlayerControlsState extends State<VideoPlayerControls> with SingleTi
       _feedbackLabel = label;
       _feedbackVisible = true;
     });
-    _feedbackTimer = Timer(const Duration(milliseconds: 800), () {
+    _feedbackTimer = Timer(const Duration(milliseconds: 1000), () {
       if (mounted) {
         setState(() => _feedbackVisible = false);
       }
@@ -394,7 +394,7 @@ class _VideoPlayerControlsState extends State<VideoPlayerControls> with SingleTi
               if (_showControls) Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.1))),
               AnimatedOpacity(
                 opacity: _showControls ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 100),
+                duration: const Duration(milliseconds: 75),
                 child: IgnorePointer(
                   ignoring: !_showControls,
                   child: Material(

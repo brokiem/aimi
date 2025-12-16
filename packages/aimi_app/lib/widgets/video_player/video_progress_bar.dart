@@ -247,6 +247,19 @@ class _ProgressBarWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Show indeterminate progress bar when duration is not yet loaded
+    if (duration.inMilliseconds == 0) {
+      return SizedBox(
+        width: width,
+        height: 4,
+        child: LinearProgressIndicator(
+          backgroundColor: backgroundColor,
+          valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+          borderRadius: BorderRadius.circular(2),
+        ),
+      );
+    }
+
     return ListenableBuilder(
       listenable: Listenable.merge([hoverValueNotifier, isHoveringNotifier, isDraggingNotifier, dragDurationNotifier]),
       builder: (context, _) {
