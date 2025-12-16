@@ -147,4 +147,12 @@ class CachingService {
 
     return parts.join('/');
   }
+
+  /// Clear all cached data.
+  ///
+  /// This removes all temporary cached data.
+  Future<void> clearAll() async {
+    final box = await _getBox();
+    await box.clear();
+  }
 }

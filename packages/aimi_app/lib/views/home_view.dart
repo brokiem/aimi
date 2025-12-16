@@ -49,7 +49,7 @@ class _HomeViewState extends State<HomeView> {
   }
 
   void _navigateToDetail(BuildContext context, Anime anime) {
-    DetailView.open(context, anime);
+    DetailView.open(context, anime, heroTagPrefix: 'home');
   }
 
   @override
@@ -85,6 +85,7 @@ class _HomeViewState extends State<HomeView> {
               (context, index) => AnimeGridTile(
                 anime: homeViewModel.trendingAnime[index],
                 onTap: (anime) => _navigateToDetail(context, anime),
+                heroTagPrefix: 'home',
               ),
               childCount: homeViewModel.trendingAnime.length,
             ),

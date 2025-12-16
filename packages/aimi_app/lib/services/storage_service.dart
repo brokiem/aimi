@@ -132,4 +132,41 @@ class StorageService {
 
     return parts.join('/');
   }
+
+  /// Get all storage data as a Map for export.
+  Future<Map<String, dynamic>> getAllData() async {
+    final box = await _getBox();
+    final Map<String, dynamic> allData = {};
+
+    // Get all keys from the box
+    final keys = box.keys;
+    for (final key in keys) {
+      final value = await box.get(key);
+      if (value != null) {
+        allData[key.toString()] = jsonDecode(value);
+      }
+    }
+
+    return allData;
+  }
+
+  /// Import storage data from a Map.
+  ///
+  /// This will overwrite existing data.
+  Future<void> importData(Map<String, dynamic> data) async {
+    final box = await _getBox();
+
+    for (final entry in data.entries) {
+      await box.put(entry.key, jsonEncode(entry.value));
+    }
+  }
+
+  /// Clear all storage data.
+  ///
+  /// Warning: This permanently deletes all user data including
+  /// watch history, search history, and watch progress.
+  Future<void> clearAll() async {
+    final box = await _getBox();
+    await box.clear();
+  }
 }

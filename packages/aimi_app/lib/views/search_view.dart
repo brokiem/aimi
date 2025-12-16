@@ -42,7 +42,7 @@ class _SearchViewState extends State<SearchView> {
   }
 
   void _navigateToDetail(BuildContext context, Anime anime) {
-    DetailView.open(context, anime);
+    DetailView.open(context, anime, heroTagPrefix: 'search');
   }
 
   @override
@@ -199,6 +199,7 @@ class _SearchViewState extends State<SearchView> {
                     return AnimeGridTile(
                       anime: viewModel.searchResults[index],
                       onTap: (anime) => _navigateToDetail(context, anime),
+                      heroTagPrefix: 'search',
                     );
                   },
                 );

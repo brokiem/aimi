@@ -62,10 +62,7 @@ void main() {
           ),
         );
 
-        fakeAnimeService.setAnimeById(
-          1,
-          TestAnimeFactory.createAnime(id: 1, englishTitle: 'Test Anime'),
-        );
+        fakeAnimeService.setAnimeById(1, TestAnimeFactory.createAnime(id: 1, englishTitle: 'Test Anime'));
 
         await viewModel.fetchWatchHistory();
 
@@ -219,10 +216,7 @@ void main() {
     group('Dispose', () {
       test('dispose cancels subscription without error', () {
         // Create a separate ViewModel for this test to avoid double dispose
-        final testVM = HistoryViewModel(
-          fakeWatchHistoryService,
-          fakeAnimeService,
-        );
+        final testVM = HistoryViewModel(fakeWatchHistoryService, fakeAnimeService);
         expect(() => testVM.dispose(), returnsNormally);
       });
     });

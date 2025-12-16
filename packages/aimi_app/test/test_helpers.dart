@@ -27,17 +27,9 @@ class FakeCachingService implements CachingService {
   // ===========================================================================
 
   @override
-  Future<void> save({
-    required CacheKey key,
-    required dynamic data,
-    Duration? expiresIn,
-    String? providerName,
-  }) async {
+  Future<void> save({required CacheKey key, required dynamic data, Duration? expiresIn, String? providerName}) async {
     final fullKey = _generateKey(key.name, null, providerName);
-    _storage[fullKey] = _CacheEntry(
-      data: data,
-      expiresAt: expiresIn != null ? DateTime.now().add(expiresIn) : null,
-    );
+    _storage[fullKey] = _CacheEntry(data: data, expiresAt: expiresIn != null ? DateTime.now().add(expiresIn) : null);
   }
 
   @override
@@ -65,28 +57,17 @@ class FakeCachingService implements CachingService {
     String? providerName,
   }) async {
     final fullKey = _generateKey(key.name, dynamicKey, providerName);
-    _storage[fullKey] = _CacheEntry(
-      data: data,
-      expiresAt: expiresIn != null ? DateTime.now().add(expiresIn) : null,
-    );
+    _storage[fullKey] = _CacheEntry(data: data, expiresAt: expiresIn != null ? DateTime.now().add(expiresIn) : null);
   }
 
   @override
-  Future<dynamic> getDynamic({
-    required CacheKey key,
-    required String dynamicKey,
-    String? providerName,
-  }) async {
+  Future<dynamic> getDynamic({required CacheKey key, required String dynamicKey, String? providerName}) async {
     final fullKey = _generateKey(key.name, dynamicKey, providerName);
     return _getWithExpiration(fullKey);
   }
 
   @override
-  Future<void> removeDynamic({
-    required CacheKey key,
-    required String dynamicKey,
-    String? providerName,
-  }) async {
+  Future<void> removeDynamic({required CacheKey key, required String dynamicKey, String? providerName}) async {
     final fullKey = _generateKey(key.name, dynamicKey, providerName);
     _storage.remove(fullKey);
   }
@@ -108,11 +89,7 @@ class FakeCachingService implements CachingService {
     return entry.data;
   }
 
-  String _generateKey(
-    String keyName,
-    String? dynamicKey,
-    String? providerName,
-  ) {
+  String _generateKey(String keyName, String? dynamicKey, String? providerName) {
     final parts = <String>['cache'];
     if (providerName != null) {
       parts.add(base64Encode(utf8.encode(providerName)));
@@ -130,6 +107,11 @@ class FakeCachingService implements CachingService {
   /// Check if a key exists (useful for assertions)
   bool containsKey(String key, {String? dynamicKey, String? providerName}) {
     return _storage.containsKey(_generateKey(key, dynamicKey, providerName));
+  }
+
+  @override
+  Future<void> clearAll() async {
+    _storage.clear();
   }
 }
 
@@ -155,11 +137,7 @@ class FakeStorageService implements StorageService {
   // ===========================================================================
 
   @override
-  Future<void> save({
-    required StorageKey key,
-    required dynamic data,
-    String? providerName,
-  }) async {
+  Future<void> save({required StorageKey key, required dynamic data, String? providerName}) async {
     final fullKey = _generateKey(key.name, null, providerName);
     _storage[fullKey] = data;
   }
@@ -192,21 +170,13 @@ class FakeStorageService implements StorageService {
   }
 
   @override
-  Future<dynamic> getDynamic({
-    required StorageKey key,
-    required String dynamicKey,
-    String? providerName,
-  }) async {
+  Future<dynamic> getDynamic({required StorageKey key, required String dynamicKey, String? providerName}) async {
     final fullKey = _generateKey(key.name, dynamicKey, providerName);
     return _storage[fullKey];
   }
 
   @override
-  Future<void> removeDynamic({
-    required StorageKey key,
-    required String dynamicKey,
-    String? providerName,
-  }) async {
+  Future<void> removeDynamic({required StorageKey key, required String dynamicKey, String? providerName}) async {
     final fullKey = _generateKey(key.name, dynamicKey, providerName);
     _storage.remove(fullKey);
   }
@@ -215,11 +185,7 @@ class FakeStorageService implements StorageService {
   // Helpers
   // ===========================================================================
 
-  String _generateKey(
-    String keyName,
-    String? dynamicKey,
-    String? providerName,
-  ) {
+  String _generateKey(String keyName, String? dynamicKey, String? providerName) {
     final parts = <String>['storage'];
     if (providerName != null) {
       parts.add(base64Encode(utf8.encode(providerName)));
@@ -237,6 +203,21 @@ class FakeStorageService implements StorageService {
   /// Check if a key exists (useful for assertions)
   bool containsKey(String key, {String? dynamicKey, String? providerName}) {
     return _storage.containsKey(_generateKey(key, dynamicKey, providerName));
+  }
+
+  @override
+  Future<Map<String, dynamic>> getAllData() async {
+    return Map.from(_storage);
+  }
+
+  @override
+  Future<void> importData(Map<String, dynamic> data) async {
+    _storage.addAll(data);
+  }
+
+  @override
+  Future<void> clearAll() async {
+    _storage.clear();
   }
 }
 
@@ -334,10 +315,8 @@ class FakeMetadataProvider implements lib.IMetadataProvider {
     return _animeMap.values
         .where(
           (a) =>
-              (a.title.english?.toLowerCase().contains(query.toLowerCase()) ??
-                  false) ||
-              (a.title.romaji?.toLowerCase().contains(query.toLowerCase()) ??
-                  false),
+              (a.title.english?.toLowerCase().contains(query.toLowerCase()) ?? false) ||
+              (a.title.romaji?.toLowerCase().contains(query.toLowerCase()) ?? false),
         )
         .toList();
   }
@@ -386,9 +365,7 @@ class FakeStreamProvider implements lib.IStreamProvider {
       throw Exception(errorMessage ?? 'Test error');
     }
     final searchQuery = query is String ? query : query.toString();
-    return _searchResults
-        .where((a) => a.title.toLowerCase().contains(searchQuery.toLowerCase()))
-        .toList();
+    return _searchResults.where((a) => a.title.toLowerCase().contains(searchQuery.toLowerCase())).toList();
   }
 
   @override
@@ -400,10 +377,7 @@ class FakeStreamProvider implements lib.IStreamProvider {
   }
 
   @override
-  Future<List<lib.StreamSource>> getSources(
-    lib.Episode episode, {
-    Map<String, dynamic>? options,
-  }) async {
+  Future<List<lib.StreamSource>> getSources(lib.Episode episode, {Map<String, dynamic>? options}) async {
     if (shouldThrow) {
       throw Exception(errorMessage ?? 'Test error');
     }
@@ -444,20 +418,13 @@ class FakeAnimeService implements AnimeService {
   String get providerName => 'FakeProvider';
 
   @override
-  Future<List<Anime>> fetchTrending({
-    int page = 1,
-    bool forceRefresh = false,
-  }) async {
+  Future<List<Anime>> fetchTrending({int page = 1, bool forceRefresh = false}) async {
     if (shouldThrow) throw Exception(errorMessage ?? 'Test error');
     return _trendingAnime;
   }
 
   @override
-  Future<Anime> getById(
-    int id, {
-    String? providerName,
-    bool forceRefresh = false,
-  }) async {
+  Future<Anime> getById(int id, {String? providerName, bool forceRefresh = false}) async {
     if (shouldThrow) throw Exception(errorMessage ?? 'Test error');
     if (_animeById.containsKey(id)) {
       return _animeById[id]!;
@@ -498,28 +465,19 @@ class FakeStreamingService implements StreamingService {
   }
 
   @override
-  Future<List<StreamingAnimeResult>> searchWithProvider(
-    lib.IStreamProvider provider,
-    Anime anime,
-  ) async {
+  Future<List<StreamingAnimeResult>> searchWithProvider(lib.IStreamProvider provider, Anime anime) async {
     if (shouldThrow) throw Exception('Test error');
     return _searchResults;
   }
 
   @override
-  Future<List<AnimeEpisode>> getEpisodesWithProvider(
-    lib.IStreamProvider provider,
-    StreamingAnimeResult anime,
-  ) async {
+  Future<List<AnimeEpisode>> getEpisodesWithProvider(lib.IStreamProvider provider, StreamingAnimeResult anime) async {
     if (shouldThrow) throw Exception('Test error');
     return _episodes;
   }
 
   @override
-  Future<List<StreamingSource>> getSources(
-    lib.IStreamProvider provider,
-    AnimeEpisode episode,
-  ) async {
+  Future<List<StreamingSource>> getSources(lib.IStreamProvider provider, AnimeEpisode episode) async {
     if (shouldThrow) throw Exception('Test error');
     return _sources;
   }
@@ -530,28 +488,17 @@ class FakeStreamingService implements StreamingService {
   }
 
   @override
-  void setCachedEpisodes(
-    int animeId,
-    String providerName,
-    List<AnimeEpisode> episodes,
-  ) {
+  void setCachedEpisodes(int animeId, String providerName, List<AnimeEpisode> episodes) {
     _cachedEpisodes['${animeId}_$providerName'] = episodes;
   }
 
   @override
-  StreamingAnimeResult? getCachedSelectedAnime(
-    int animeId,
-    String providerName,
-  ) {
+  StreamingAnimeResult? getCachedSelectedAnime(int animeId, String providerName) {
     return _cachedSelectedAnime['${animeId}_$providerName'];
   }
 
   @override
-  void setCachedSelectedAnime(
-    int animeId,
-    String providerName,
-    StreamingAnimeResult? anime,
-  ) {
+  void setCachedSelectedAnime(int animeId, String providerName, StreamingAnimeResult? anime) {
     _cachedSelectedAnime['${animeId}_$providerName'] = anime;
   }
 }
@@ -597,10 +544,7 @@ class TestAnimeFactory {
       characters: [],
       staff: [],
       studios: [],
-      coverImage: CoverImage(
-        extraLarge: 'https://example.com/xl.jpg',
-        large: 'https://example.com/l.jpg',
-      ),
+      coverImage: CoverImage(extraLarge: 'https://example.com/xl.jpg', large: 'https://example.com/l.jpg'),
       genres: genres,
       synonyms: [],
       siteUrl: 'https://example.com/anime/$id',
@@ -628,10 +572,7 @@ class TestAnimeFactory {
       description: description,
       countryOfOrigin: 'JP',
       updatedAt: 0,
-      coverImage: lib.CoverImage(
-        extraLarge: 'https://example.com/xl.jpg',
-        large: 'https://example.com/l.jpg',
-      ),
+      coverImage: lib.CoverImage(extraLarge: 'https://example.com/xl.jpg', large: 'https://example.com/l.jpg'),
       siteUrl: 'https://example.com/anime/$id',
     );
   }
@@ -659,11 +600,7 @@ class TestAnimeFactory {
     String title = 'Test Anime',
     int availableEpisodes = 12,
   }) {
-    return StreamingAnimeResult(
-      id: id,
-      title: title,
-      availableEpisodes: availableEpisodes,
-    );
+    return StreamingAnimeResult(id: id, title: title, availableEpisodes: availableEpisodes);
   }
 
   static StreamingSource createSource({
@@ -671,11 +608,86 @@ class TestAnimeFactory {
     String quality = '1080p',
     bool isM3U8 = true,
   }) {
-    return StreamingSource(
-      url: url,
-      quality: quality,
-      isM3U8: isM3U8,
-      subtitles: [],
-    );
+    return StreamingSource(url: url, quality: quality, isM3U8: isM3U8, subtitles: []);
+  }
+}
+
+// =============================================================================
+// FAKE PREFERENCES SERVICE
+// =============================================================================
+
+/// Fake implementation of PreferencesService for testing.
+///
+/// Stores preferences in memory without SharedPreferences dependency.
+class FakePreferencesService {
+  final Map<String, dynamic> _prefs = {};
+
+  Future<T?> get<T>(PrefKey key) async {
+    return _prefs[key.name] as T?;
+  }
+
+  Future<void> set<T>(PrefKey key, T value) async {
+    _prefs[key.name] = value;
+  }
+
+  Future<void> remove(PrefKey key) async {
+    _prefs.remove(key.name);
+  }
+
+  Future<Map<String, dynamic>> getAllPreferences() async {
+    return Map.from(_prefs);
+  }
+
+  Future<void> clearAll() async {
+    _prefs.clear();
+  }
+
+  /// Test helper to pre-populate preferences
+  void setAll(Map<String, dynamic> values) {
+    _prefs.addAll(values);
+  }
+
+  /// Test helper to check if empty
+  bool get isEmpty => _prefs.isEmpty;
+}
+
+/// Preference keys enum copy for tests (avoids importing preferences_service.dart)
+enum PrefKey {
+  subtitlePreference,
+  audioPreference,
+  videoVolume,
+  themeMode,
+  seedColor,
+  enableHeroAnimation,
+  titleLanguagePreference,
+}
+
+// =============================================================================
+// FAKE SETTINGS SERVICE
+// =============================================================================
+
+/// Fake implementation of SettingsService for testing.
+///
+/// Provides controllable settings values without persistence.
+class FakeSettingsService {
+  bool enableHeroAnimation = true;
+  String titleLanguagePreference = 'english';
+
+  int notifyCount = 0;
+
+  void setEnableHeroAnimation(bool value) {
+    enableHeroAnimation = value;
+    notifyCount++;
+  }
+
+  void setTitleLanguagePreference(String value) {
+    titleLanguagePreference = value;
+    notifyCount++;
+  }
+
+  void reset() {
+    enableHeroAnimation = true;
+    titleLanguagePreference = 'english';
+    notifyCount = 0;
   }
 }

@@ -52,6 +52,7 @@ dependencies:
   path_provider: ^2.1.5
   hive_ce: ^2.15.1
   hive_ce_flutter: ^2.3.3
+  file_picker: ^10.3.7
 
 dev_dependencies:
   flutter_test:

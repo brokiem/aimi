@@ -1,7 +1,9 @@
 import 'package:aimi_app/services/anime_service.dart';
 import 'package:aimi_app/services/caching_service.dart';
+import 'package:aimi_app/services/data_export_service.dart';
 import 'package:aimi_app/services/preferences_service.dart';
 import 'package:aimi_app/services/search_history_service.dart';
+import 'package:aimi_app/services/settings_service.dart';
 import 'package:aimi_app/services/storage_service.dart';
 import 'package:aimi_app/services/stream_provider_registry.dart';
 import 'package:aimi_app/services/streaming_service.dart';
@@ -11,6 +13,7 @@ import 'package:aimi_app/services/watch_history_service.dart';
 import 'package:aimi_app/viewmodels/history_viewmodel.dart';
 import 'package:aimi_app/viewmodels/home_viewmodel.dart';
 import 'package:aimi_app/viewmodels/search_viewmodel.dart';
+import 'package:aimi_app/viewmodels/settings_viewmodel.dart';
 import 'package:aimi_app/views/main_view.dart';
 import 'package:aimi_lib/aimi_lib.dart';
 import 'package:flutter/material.dart';
@@ -46,7 +49,9 @@ class AimiApp extends StatelessWidget {
     final searchHistoryService = SearchHistoryService(storageService);
     final watchHistoryService = WatchHistoryService(storageService);
     final themeService = ThemeService(preferencesService);
+    final settingsService = SettingsService(preferencesService);
     final thumbnailService = ThumbnailService();
+    final dataExportService = DataExportService(preferencesService, storageService, cachingService);
 
     // Create stream provider registry with all available providers
     final streamProviderRegistry = StreamProviderRegistry([AnimePaheProvider(), AnizoneProvider()]);
@@ -65,14 +70,19 @@ class AimiApp extends StatelessWidget {
         Provider<SearchHistoryService>.value(value: searchHistoryService),
         Provider<WatchHistoryService>.value(value: watchHistoryService),
         ChangeNotifierProvider<ThemeService>.value(value: themeService),
+        ChangeNotifierProvider<SettingsService>.value(value: settingsService),
         Provider<ThumbnailService>.value(value: thumbnailService),
+        Provider<DataExportService>.value(value: dataExportService),
         ChangeNotifierProvider(create: (_) => HomeViewModel(animeService)),
         ChangeNotifierProvider(create: (_) => HistoryViewModel(watchHistoryService, animeService)),
         ChangeNotifierProvider(create: (_) => SearchViewModel(animeService, searchHistoryService)),
+        ChangeNotifierProvider(
+          create: (_) => SettingsViewModel(dataExportService, settingsService, themeService, watchHistoryService),
+        ),
       ],
 
-      child: Consumer<ThemeService>(
-        builder: (context, themeService, child) {
+      child: Consumer2<ThemeService, SettingsService>(
+        builder: (context, themeService, settingsService, child) {
           return MaterialApp(
             title: 'Aimi',
             debugShowCheckedModeBanner: false,

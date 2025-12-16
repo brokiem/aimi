@@ -1,5 +1,8 @@
+import 'package:aimi_app/services/settings_service.dart';
+import 'package:aimi_app/utils/title_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
 import '../models/anime.dart';
 
@@ -17,6 +20,11 @@ class _AnimeHeaderState extends State<AnimeHeader> {
   bool _isOverflowing = false;
   final int _maxLines = 6;
 
+  String _getPreferredTitle(BuildContext context) {
+    final settingsService = context.watch<SettingsService>();
+    return getPreferredTitle(widget.anime.title, settingsService.titleLanguagePreference);
+  }
+
   @override
   Widget build(BuildContext context) {
     final descriptionStyle = GoogleFonts.inter(
@@ -28,10 +36,7 @@ class _AnimeHeaderState extends State<AnimeHeader> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          widget.anime.title.english ?? widget.anime.title.romaji ?? '',
-          style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w600),
-        ),
+        Text(_getPreferredTitle(context), style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         LayoutBuilder(
           builder: (context, constraints) {

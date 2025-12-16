@@ -11,11 +11,15 @@ class HistoryViewModel extends ChangeNotifier {
   final AnimeService _animeService;
 
   StreamSubscription<WatchHistoryEntry>? _historyUpdateSubscription;
+  StreamSubscription<void>? _dataChangedSubscription;
 
   HistoryViewModel(this._watchHistoryService, this._animeService) {
     // Listen to watch history updates
     _historyUpdateSubscription = _watchHistoryService.onProgressUpdated.listen((entry) {
-      // Refresh history when updates occur
+      fetchWatchHistory();
+    });
+    // Listen to bulk data changes (import/clear)
+    _dataChangedSubscription = _watchHistoryService.onDataChanged.listen((_) {
       fetchWatchHistory();
     });
   }
@@ -79,6 +83,7 @@ class HistoryViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _historyUpdateSubscription?.cancel();
+    _dataChangedSubscription?.cancel();
     super.dispose();
   }
 }

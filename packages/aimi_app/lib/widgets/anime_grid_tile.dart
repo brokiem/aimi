@@ -1,7 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart'; // Added this import for CachedNetworkImageProvider
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../models/anime.dart';
+import '../services/settings_service.dart';
+import '../utils/title_helper.dart';
 
 /// A grid tile widget for displaying anime information.
 ///
@@ -14,7 +17,10 @@ class AnimeGridTile extends StatefulWidget {
   final Anime anime;
   final void Function(Anime) onTap;
 
-  const AnimeGridTile({super.key, required this.anime, required this.onTap});
+  /// Optional prefix to make Hero tag unique across different views.
+  final String? heroTagPrefix;
+
+  const AnimeGridTile({super.key, required this.anime, required this.onTap, this.heroTagPrefix});
 
   @override
   State<AnimeGridTile> createState() => _AnimeGridTileState();
@@ -60,11 +66,7 @@ class _AnimeGridTileState extends State<AnimeGridTile> {
                 color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 child: Stack(
                   children: [
-                    Ink.image(
-                      image: CachedNetworkImageProvider(widget.anime.coverImage.large),
-                      fit: BoxFit.cover,
-                      child: InkWell(onTap: onTap),
-                    ),
+                    _buildCoverImage(context),
                     // Score badge (top-left)
                     if (anime.averageScore != null)
                       Positioned(
@@ -136,19 +138,44 @@ class _AnimeGridTileState extends State<AnimeGridTile> {
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              widget.anime.title.english ?? widget.anime.title.romaji ?? widget.anime.title.native,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w500,
-                color: _isHovered ? Theme.of(context).colorScheme.primary : null,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+            Consumer<SettingsService>(
+              builder: (context, settingsService, child) {
+                final preferredTitle = getPreferredTitle(widget.anime.title, settingsService.titleLanguagePreference);
+                return Text(
+                  preferredTitle,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: _isHovered ? Theme.of(context).colorScheme.primary : null,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                );
+              },
             ),
           ],
         ),
       ),
     );
+  }
+
+  /// Builds the cover image with optional Hero animation based on settings.
+  Widget _buildCoverImage(BuildContext context) {
+    final settingsService = context.watch<SettingsService>();
+    final coverImage = Ink.image(
+      image: CachedNetworkImageProvider(widget.anime.coverImage.large),
+      fit: BoxFit.cover,
+      child: InkWell(onTap: () => widget.onTap(widget.anime)),
+    );
+
+    if (settingsService.enableHeroAnimation && widget.heroTagPrefix != null) {
+      final tagPrefix = widget.heroTagPrefix;
+      return Hero(
+        tag: 'anime_cover_${tagPrefix}_${widget.anime.id}',
+        // Material is required during Hero flight as Ink needs a Material ancestor
+        child: Material(type: MaterialType.transparency, child: coverImage),
+      );
+    }
+    return coverImage;
   }
 
   /// Returns a color based on the score (similar to Rotten Tomatoes)

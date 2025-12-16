@@ -20,10 +20,7 @@ void main() {
     // =========================================================================
     group('Simple Key Operations', () {
       test('save and get work with CacheKey', () async {
-        await service.save(
-          key: CacheKey.trendingAnime,
-          data: ['anime1', 'anime2'],
-        );
+        await service.save(key: CacheKey.trendingAnime, data: ['anime1', 'anime2']);
 
         final data = await service.get(key: CacheKey.trendingAnime);
 
@@ -40,11 +37,7 @@ void main() {
       });
 
       test('data with expiration works', () async {
-        await service.save(
-          key: CacheKey.trendingAnime,
-          data: 'valid',
-          expiresIn: const Duration(hours: 1),
-        );
+        await service.save(key: CacheKey.trendingAnime, data: 'valid', expiresIn: const Duration(hours: 1));
 
         final data = await service.get(key: CacheKey.trendingAnime);
         expect(data, 'valid');
@@ -56,25 +49,11 @@ void main() {
     // =========================================================================
     group('Provider Namespacing', () {
       test('same key with different providers are separate', () async {
-        await service.save(
-          key: CacheKey.trendingAnime,
-          data: 'provider_a_data',
-          providerName: 'ProviderA',
-        );
-        await service.save(
-          key: CacheKey.trendingAnime,
-          data: 'provider_b_data',
-          providerName: 'ProviderB',
-        );
+        await service.save(key: CacheKey.trendingAnime, data: 'provider_a_data', providerName: 'ProviderA');
+        await service.save(key: CacheKey.trendingAnime, data: 'provider_b_data', providerName: 'ProviderB');
 
-        final dataA = await service.get(
-          key: CacheKey.trendingAnime,
-          providerName: 'ProviderA',
-        );
-        final dataB = await service.get(
-          key: CacheKey.trendingAnime,
-          providerName: 'ProviderB',
-        );
+        final dataA = await service.get(key: CacheKey.trendingAnime, providerName: 'ProviderA');
+        final dataB = await service.get(key: CacheKey.trendingAnime, providerName: 'ProviderB');
 
         expect(dataA, 'provider_a_data');
         expect(dataB, 'provider_b_data');
@@ -82,17 +61,10 @@ void main() {
 
       test('key without provider is separate from key with provider', () async {
         await service.save(key: CacheKey.trendingAnime, data: 'no_provider');
-        await service.save(
-          key: CacheKey.trendingAnime,
-          data: 'with_provider',
-          providerName: 'TestProvider',
-        );
+        await service.save(key: CacheKey.trendingAnime, data: 'with_provider', providerName: 'TestProvider');
 
         final noProvider = await service.get(key: CacheKey.trendingAnime);
-        final withProvider = await service.get(
-          key: CacheKey.trendingAnime,
-          providerName: 'TestProvider',
-        );
+        final withProvider = await service.get(key: CacheKey.trendingAnime, providerName: 'TestProvider');
 
         expect(noProvider, 'no_provider');
         expect(withProvider, 'with_provider');

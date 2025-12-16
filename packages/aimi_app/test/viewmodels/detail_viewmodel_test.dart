@@ -365,5 +365,70 @@ void main() {
         expect(notifyCount, greaterThan(0));
       });
     });
+
+    // =========================================================================
+    // Disposal Safety Tests
+    // =========================================================================
+    group('Disposal Safety', () {
+      test('dispose during loadAnime does not throw', () async {
+        fakeStreamingService.setSearchResults([TestAnimeFactory.createStreamingResult(id: '1')]);
+        fakeStreamingService.setEpisodes([TestAnimeFactory.createEpisode(id: 'ep-1')]);
+
+        // Start loading
+        final future = viewModel.loadAnime();
+
+        // Dispose immediately
+        viewModel.dispose();
+
+        // Should complete without throwing
+        await expectLater(future, completes);
+      });
+
+      test('dispose during loadEpisodes does not throw', () async {
+        final streamingResult = TestAnimeFactory.createStreamingResult(id: '1');
+        fakeStreamingService.setEpisodes([TestAnimeFactory.createEpisode(id: 'ep-1')]);
+
+        // Start loading
+        final future = viewModel.loadEpisodes(streamingResult);
+
+        // Dispose immediately
+        viewModel.dispose();
+
+        // Should complete without throwing
+        await expectLater(future, completes);
+      });
+
+      test('dispose during loadSources does not throw', () async {
+        final episode = TestAnimeFactory.createEpisode(id: 'ep-1');
+        fakeStreamingService.setSources([TestAnimeFactory.createSource(quality: '1080p')]);
+
+        // Start loading
+        final future = viewModel.loadSources(episode);
+
+        // Dispose immediately
+        viewModel.dispose();
+
+        // Should complete without throwing
+        await expectLater(future, completes);
+      });
+
+      test('notifications stop after disposal', () async {
+        int notifyCount = 0;
+        viewModel.addListener(() => notifyCount++);
+
+        fakeStreamingService.setSearchResults([]);
+
+        // Start loading then dispose
+        final loadFuture = viewModel.loadAnime();
+        viewModel.dispose();
+
+        // Complete the load
+        await loadFuture;
+
+        // Should not have notified after disposal
+        // (initial notifications before dispose are okay)
+        expect(notifyCount, lessThanOrEqualTo(2));
+      });
+    });
   });
 }

@@ -17,6 +17,12 @@ enum PrefKey {
 
   /// Seed color for dynamic theme (int value of color)
   seedColor,
+
+  /// Enable hero animations on page transitions
+  enableHeroAnimation,
+
+  /// Title language preference (english, romaji, native)
+  titleLanguagePreference,
 }
 
 /// Service for managing user preferences.
@@ -74,5 +80,29 @@ class PreferencesService {
   Future<void> remove(PrefKey key) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyString(key));
+  }
+
+  /// Get all preferences as a Map for export.
+  Future<Map<String, dynamic>> getAllPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    final Map<String, dynamic> allPrefs = {};
+
+    for (final key in PrefKey.values) {
+      final keyStr = _keyString(key);
+      final value = prefs.get(keyStr);
+      if (value != null) {
+        allPrefs[key.name] = value;
+      }
+    }
+
+    return allPrefs;
+  }
+
+  /// Clear all preferences.
+  Future<void> clearAll() async {
+    final prefs = await SharedPreferences.getInstance();
+    for (final key in PrefKey.values) {
+      await prefs.remove(_keyString(key));
+    }
   }
 }

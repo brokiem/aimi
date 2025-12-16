@@ -41,4 +41,9 @@ class ThemeService extends ChangeNotifier {
     notifyListeners();
     await _preferencesService.set(PrefKey.seedColor, color.value);
   }
+
+  /// Reload settings from preferences (e.g., after import).
+  Future<void> loadSettings() async {
+    await _loadPreferences();
+  }
 }

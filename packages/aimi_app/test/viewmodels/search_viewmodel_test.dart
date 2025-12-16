@@ -80,9 +80,7 @@ void main() {
       });
 
       test('empty query is ignored', () async {
-        fakeAnimeService.setSearchResults([
-          TestAnimeFactory.createAnime(id: 1),
-        ]);
+        fakeAnimeService.setSearchResults([TestAnimeFactory.createAnime(id: 1)]);
 
         await viewModel.search('');
 
@@ -91,9 +89,7 @@ void main() {
       });
 
       test('whitespace-only query is ignored', () async {
-        fakeAnimeService.setSearchResults([
-          TestAnimeFactory.createAnime(id: 1),
-        ]);
+        fakeAnimeService.setSearchResults([TestAnimeFactory.createAnime(id: 1)]);
 
         await viewModel.search('   ');
 
@@ -183,9 +179,7 @@ void main() {
     // =========================================================================
     group('clearResults', () {
       test('clears search results', () async {
-        fakeAnimeService.setSearchResults([
-          TestAnimeFactory.createAnime(id: 1),
-        ]);
+        fakeAnimeService.setSearchResults([TestAnimeFactory.createAnime(id: 1)]);
         await viewModel.search('test');
 
         viewModel.clearResults();

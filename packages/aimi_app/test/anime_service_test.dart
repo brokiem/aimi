@@ -1,5 +1,4 @@
 import 'package:aimi_app/services/anime_service.dart';
-import 'package:aimi_app/services/caching_service.dart';
 import 'package:aimi_app/services/storage_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -20,35 +19,14 @@ void main() {
       storageService = FakeStorageService();
 
       // Add test data
+      providerA.addAnime(TestAnimeFactory.createMedia(id: 1, englishTitle: 'Anime A', romajiTitle: 'Anime A Romaji'));
       providerA.addAnime(
-        TestAnimeFactory.createMedia(
-          id: 1,
-          englishTitle: 'Anime A',
-          romajiTitle: 'Anime A Romaji',
-        ),
-      );
-      providerA.addAnime(
-        TestAnimeFactory.createMedia(
-          id: 2,
-          englishTitle: 'Another Anime A',
-          romajiTitle: 'Another A Romaji',
-        ),
+        TestAnimeFactory.createMedia(id: 2, englishTitle: 'Another Anime A', romajiTitle: 'Another A Romaji'),
       );
 
-      providerB.addAnime(
-        TestAnimeFactory.createMedia(
-          id: 1,
-          englishTitle: 'Anime B',
-          romajiTitle: 'Anime B Romaji',
-        ),
-      );
+      providerB.addAnime(TestAnimeFactory.createMedia(id: 1, englishTitle: 'Anime B', romajiTitle: 'Anime B Romaji'));
 
-      service = AnimeService(
-        [providerA, providerB],
-        cachingService,
-        storageService,
-        defaultProviderName: 'ProviderA',
-      );
+      service = AnimeService([providerA, providerB], cachingService, storageService, defaultProviderName: 'ProviderA');
     });
 
     tearDown(() {
@@ -63,40 +41,19 @@ void main() {
       test('throws if no providers are provided', () {
         expect(
           () => AnimeService([], cachingService, storageService),
-          throwsA(
-            isA<Exception>().having(
-              (e) => e.toString(),
-              'message',
-              contains('At least one provider'),
-            ),
-          ),
+          throwsA(isA<Exception>().having((e) => e.toString(), 'message', contains('At least one provider'))),
         );
       });
 
       test('throws if default provider not found', () {
         expect(
-          () => AnimeService(
-            [providerA],
-            cachingService,
-            storageService,
-            defaultProviderName: 'NonExistent',
-          ),
-          throwsA(
-            isA<Exception>().having(
-              (e) => e.toString(),
-              'message',
-              contains('Default provider'),
-            ),
-          ),
+          () => AnimeService([providerA], cachingService, storageService, defaultProviderName: 'NonExistent'),
+          throwsA(isA<Exception>().having((e) => e.toString(), 'message', contains('Default provider'))),
         );
       });
 
       test('uses first provider as default when not specified', () {
-        final svc = AnimeService(
-          [providerB, providerA],
-          cachingService,
-          storageService,
-        );
+        final svc = AnimeService([providerB, providerA], cachingService, storageService);
         expect(svc.providerName, 'ProviderB');
       });
     });
@@ -120,10 +77,7 @@ void main() {
       });
 
       test('getById throws if provider not found', () async {
-        expect(
-          () => service.getById(1, providerName: 'UnknownProvider'),
-          throwsException,
-        );
+        expect(() => service.getById(1, providerName: 'UnknownProvider'), throwsException);
       });
     });
 
@@ -136,13 +90,7 @@ void main() {
         await service.fetchTrending();
 
         // Verify data was cached
-        expect(
-          cachingService.containsKey(
-            'trendingAnime',
-            providerName: 'ProviderA',
-          ),
-          isTrue,
-        );
+        expect(cachingService.containsKey('trendingAnime', providerName: 'ProviderA'), isTrue);
       });
 
       test('fetchTrending returns cached data on subsequent calls', () async {
@@ -150,9 +98,7 @@ void main() {
         final first = await service.fetchTrending();
 
         // Modify provider data
-        providerA.addAnime(
-          TestAnimeFactory.createMedia(id: 99, englishTitle: 'New Anime'),
-        );
+        providerA.addAnime(TestAnimeFactory.createMedia(id: 99, englishTitle: 'New Anime'));
 
         // Second call should return cached data (no new anime)
         final second = await service.fetchTrending();
@@ -165,9 +111,7 @@ void main() {
         await service.fetchTrending();
 
         // Modify provider data
-        providerA.addAnime(
-          TestAnimeFactory.createMedia(id: 99, englishTitle: 'New Anime'),
-        );
+        providerA.addAnime(TestAnimeFactory.createMedia(id: 99, englishTitle: 'New Anime'));
 
         // Force refresh should get new data
         final refreshed = await service.fetchTrending(forceRefresh: true);
@@ -178,11 +122,7 @@ void main() {
         await service.getById(1);
 
         expect(
-          storageService.containsKey(
-            StorageKey.animeDetails.name,
-            dynamicKey: '1',
-            providerName: 'ProviderA',
-          ),
+          storageService.containsKey(StorageKey.animeDetails.name, dynamicKey: '1', providerName: 'ProviderA'),
           isTrue,
         );
       });
@@ -206,9 +146,7 @@ void main() {
         await service.fetchTrending(page: 1);
 
         // Simulate provider returning different data for page 2
-        providerA.setAnimeList([
-          TestAnimeFactory.createMedia(id: 3, englishTitle: 'Page 2 Anime'),
-        ]);
+        providerA.setAnimeList([TestAnimeFactory.createMedia(id: 3, englishTitle: 'Page 2 Anime')]);
 
         // Second page
         await service.fetchTrending(page: 2, forceRefresh: true);
@@ -254,23 +192,14 @@ void main() {
 
         expect(
           () => service.getById(1),
-          throwsA(
-            isA<Exception>().having(
-              (e) => e.toString(),
-              'message',
-              contains('Provider error'),
-            ),
-          ),
+          throwsA(isA<Exception>().having((e) => e.toString(), 'message', contains('Provider error'))),
         );
       });
 
       test('fetchTrending propagates provider errors', () async {
         providerA.shouldThrow = true;
 
-        expect(
-          () => service.fetchTrending(forceRefresh: true),
-          throwsException,
-        );
+        expect(() => service.fetchTrending(forceRefresh: true), throwsException);
       });
 
       test('search propagates provider errors', () async {

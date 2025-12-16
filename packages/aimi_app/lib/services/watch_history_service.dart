@@ -18,9 +18,13 @@ class WatchHistoryService {
   WatchHistoryService(this._storageService);
 
   final _updateController = StreamController<WatchHistoryEntry>.broadcast();
+  final _dataChangedController = StreamController<void>.broadcast();
 
   /// Stream of watch history entries that have been updated.
   Stream<WatchHistoryEntry> get onProgressUpdated => _updateController.stream;
+
+  /// Stream that fires when bulk data changes occur (import, clear).
+  Stream<void> get onDataChanged => _dataChangedController.stream;
 
   /// Generate the dynamic key for a specific episode's progress.
   String _progressDynamicKey(int animeId, String episodeId) {
@@ -167,6 +171,12 @@ class WatchHistoryService {
   /// Clear all watch history.
   Future<void> clearHistory() async {
     await _storageService.remove(key: StorageKey.watchHistory);
+    _dataChangedController.add(null);
+  }
+
+  /// Notify listeners that bulk data has changed (e.g., after import).
+  void notifyDataChanged() {
+    _dataChangedController.add(null);
   }
 
   /// Get the best resume position for an episode, checking both exact provider match

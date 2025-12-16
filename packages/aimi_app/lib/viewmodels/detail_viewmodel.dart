@@ -14,7 +14,23 @@ class DetailViewModel extends ChangeNotifier {
   final StreamingService _streamingService;
   final StreamProviderRegistry _providerRegistry;
 
+  bool _disposed = false;
+
   DetailViewModel(this.anime, this._streamingService, this._providerRegistry);
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  /// Safely notify listeners only if not disposed.
+  /// Use this after async operations that may complete after disposal.
+  void _safeNotifyListeners() {
+    if (!_disposed) {
+      notifyListeners();
+    }
+  }
 
   ProviderLoadingState _state = ProviderLoadingState.idle;
   String? _errorMessage;
@@ -180,10 +196,10 @@ class DetailViewModel extends ChangeNotifier {
         _state = ProviderLoadingState.error;
         _errorMessage ??= 'Failed to load data';
       }
-      notifyListeners();
+      _safeNotifyListeners();
     } else {
       // Also notify for non-current providers to update their episode counts in the UI
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -262,7 +278,7 @@ class DetailViewModel extends ChangeNotifier {
       // Do NOT cache empty list on error
     }
 
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   /// Load stream sources for a specific episode
@@ -297,7 +313,7 @@ class DetailViewModel extends ChangeNotifier {
       _errorMessage = 'Failed to load sources: ${e.toString()}';
     }
 
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   /// Select a different anime from search results

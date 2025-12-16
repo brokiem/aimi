@@ -1,3 +1,5 @@
+import 'package:aimi_app/services/settings_service.dart';
+import 'package:aimi_app/utils/title_helper.dart';
 import 'package:aimi_app/viewmodels/detail_viewmodel.dart';
 import 'package:aimi_app/widgets/anime_characters_card.dart';
 import 'package:aimi_app/widgets/anime_cover.dart';
@@ -22,9 +24,11 @@ import '../services/streaming_service.dart';
 import 'video_player_view.dart';
 
 class DetailView extends StatefulWidget {
-  const DetailView({super.key});
+  final String? heroTagPrefix;
 
-  static void open(BuildContext context, Anime anime) {
+  const DetailView({super.key, this.heroTagPrefix});
+
+  static void open(BuildContext context, Anime anime, {String? heroTagPrefix}) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -33,7 +37,7 @@ class DetailView extends StatefulWidget {
           final providerRegistry = Provider.of<StreamProviderRegistry>(context, listen: false);
           return ChangeNotifierProvider(
             create: (context) => DetailViewModel(anime, streamingService, providerRegistry),
-            child: const DetailView(),
+            child: DetailView(heroTagPrefix: heroTagPrefix),
           );
         },
       ),
@@ -130,7 +134,7 @@ class _DetailViewState extends State<DetailView> with TickerProviderStateMixin {
                 return VideoPlayerView(
                   sources: sources,
                   episodeTitle: 'Episode ${episode.number}',
-                  animeTitle: viewModel.anime.title.romaji ?? viewModel.anime.title.english ?? '',
+                  animeTitle: _getPreferredTitle(context, viewModel.anime),
                   detailViewModel: viewModel,
                   animeId: viewModel.anime.id,
                   episodeId: episode.id,
@@ -322,7 +326,7 @@ class _DetailViewState extends State<DetailView> with TickerProviderStateMixin {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Cover Image
-                    AnimeCover(pictureUrl: anime.coverImage.large, width: 115, height: 170),
+                    _buildHeroCover(context, anime, width: 115, height: 170),
                     const SizedBox(width: 16),
                     // Title and Summary Info
                     Expanded(
@@ -332,7 +336,7 @@ class _DetailViewState extends State<DetailView> with TickerProviderStateMixin {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              anime.title.english ?? anime.title.romaji ?? 'Unknown Title',
+                              _getPreferredTitle(context, anime),
                               style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                               maxLines: 3,
                               overflow: TextOverflow.ellipsis,
@@ -460,6 +464,33 @@ class _DetailViewState extends State<DetailView> with TickerProviderStateMixin {
     return htmlString.replaceAll(exp, '').replaceAll('&br&', '\n');
   }
 
+  /// Builds cover image with optional Hero animation based on settings.
+  Widget _buildHeroCover(BuildContext context, Anime anime, {double width = 202, double height = 285}) {
+    final settingsService = context.watch<SettingsService>();
+    final cover = AnimeCover(pictureUrl: anime.coverImage.large, width: width, height: height);
+
+    if (settingsService.enableHeroAnimation) {
+      final tagPrefix = widget.heroTagPrefix ?? 'default';
+      return Hero(tag: 'anime_cover_${tagPrefix}_${anime.id}', child: cover);
+    }
+    return cover;
+  }
+
+  /// Get the preferred title based on user settings.
+  String _getPreferredTitle(BuildContext context, Anime anime) {
+    final settingsService = context.watch<SettingsService>();
+    final pref = settingsService.titleLanguagePreference;
+
+    switch (pref) {
+      case TitleLanguage.english:
+        return anime.title.english ?? anime.title.romaji ?? anime.title.native;
+      case TitleLanguage.romaji:
+        return anime.title.romaji ?? anime.title.english ?? anime.title.native;
+      case TitleLanguage.native:
+        return anime.title.native.isNotEmpty ? anime.title.native : (anime.title.romaji ?? anime.title.english ?? '');
+    }
+  }
+
   Widget _buildDesktopScaffold(BuildContext context, Anime anime) {
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -558,7 +589,7 @@ class _DetailViewState extends State<DetailView> with TickerProviderStateMixin {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Left Column: Cover + Buttons
-            AnimeCover(pictureUrl: anime.coverImage.large),
+            _buildHeroCover(context, anime),
             const SizedBox(width: 28),
             // Right Column: Title + Description
             Expanded(

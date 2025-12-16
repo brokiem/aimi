@@ -35,7 +35,7 @@ class _HistoryViewState extends State<HistoryView> {
   }
 
   void _navigateToDetail(BuildContext context, Anime anime) {
-    DetailView.open(context, anime);
+    DetailView.open(context, anime, heroTagPrefix: 'history');
   }
 
   @override
@@ -88,6 +88,7 @@ class _HistoryViewState extends State<HistoryView> {
               (context, index) => AnimeGridTile(
                 anime: viewModel.watchedAnime[index],
                 onTap: (anime) => _navigateToDetail(context, anime),
+                heroTagPrefix: 'history',
               ),
               childCount: viewModel.watchedAnime.length,
             ),
