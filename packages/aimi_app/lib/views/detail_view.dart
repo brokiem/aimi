@@ -479,16 +479,7 @@ class _DetailViewState extends State<DetailView> with TickerProviderStateMixin {
   /// Get the preferred title based on user settings.
   String _getPreferredTitle(BuildContext context, Anime anime) {
     final settingsService = context.watch<SettingsService>();
-    final pref = settingsService.titleLanguagePreference;
-
-    switch (pref) {
-      case TitleLanguage.english:
-        return anime.title.english ?? anime.title.romaji ?? anime.title.native;
-      case TitleLanguage.romaji:
-        return anime.title.romaji ?? anime.title.english ?? anime.title.native;
-      case TitleLanguage.native:
-        return anime.title.native.isNotEmpty ? anime.title.native : (anime.title.romaji ?? anime.title.english ?? '');
-    }
+    return getPreferredTitle(anime.title, settingsService.titleLanguagePreference);
   }
 
   Widget _buildDesktopScaffold(BuildContext context, Anime anime) {
