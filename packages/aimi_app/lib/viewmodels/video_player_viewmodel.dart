@@ -323,10 +323,7 @@ class VideoPlayerViewModel extends ChangeNotifier {
     if (result.position == Duration.zero || _isDisposed) return;
 
     // Wait for duration to be available
-    final duration = await player.stream.buffer
-        .where((bufferDuration) => bufferDuration > Duration.zero)
-        .first
-        .then((_) => player.state.duration);
+    final duration = await player.stream.duration.firstWhere((d) => d > Duration.zero);
 
     // Validate cross-provider match
     if (result.isCrossProvider && result.matchDurationMs != null) {
